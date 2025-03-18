@@ -1,4 +1,4 @@
-package migrations
+package hasura
 
 import (
 	"database/sql"
@@ -12,7 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-//go:embed postgres/*.sql
+//go:embed migrations/*.sql
 var postgresMigrations embed.FS
 
 func MigrateI3S(config *configs.Config) error {
@@ -33,7 +33,7 @@ func MigrateI3S(config *configs.Config) error {
 		return fmt.Errorf("failed to create driver: %w", err)
 	}
 
-	source, err := iofs.New(postgresMigrations, "postgres")
+	source, err := iofs.New(postgresMigrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("failed to create source: %w", err)
 	}

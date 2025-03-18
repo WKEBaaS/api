@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS dbo.objects
 (
     oid                 UUID        DEFAULT uuid_generate_v4() NOT NULL,
@@ -10,13 +9,13 @@ CREATE TABLE IF NOT EXISTS dbo.objects
     created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP  NOT NULL,
     updated_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP  NOT NULL,
     deleted_at          TIMESTAMPTZ,
-    owner_uid           UUID,
+    owner_id            UUID,
     click_count         INT         DEFAULT 0                  NOT NULL,
     outlink_count       INT,
     inlink_count        INT,
     is_hidden           BOOLEAN     DEFAULT FALSE              NOT NULL,
     CONSTRAINT pk_objects PRIMARY KEY (oid),
-    CONSTRAINT fk_objects_owner_uid FOREIGN KEY (owner_uid) REFERENCES auth.users (uid)
+    CONSTRAINT fk_objects_owner_uid FOREIGN KEY (owner_id) REFERENCES auth.users
 );
 
 CREATE INDEX IF NOT EXISTS idx_object_chinese_name ON dbo.objects (chinese_name);
@@ -63,12 +62,12 @@ CREATE TABLE IF NOT EXISTS dbo.classes
     hierarchy_level     SMALLINT,
     click_count         INT         DEFAULT 0                 NOT NULL,
     keywords            TEXT[]      DEFAULT '{}',
-    owner_uid           UUID        DEFAULT NULL,
+    owner_id            UUID        DEFAULT NULL,
     is_hidden           BOOLEAN     DEFAULT FALSE             NOT NULL,
     is_child            BOOLEAN     DEFAULT FALSE             NOT NULL,
     CONSTRAINT pk_class PRIMARY KEY (cid),
     CONSTRAINT fk_class_entities FOREIGN KEY (entity_id) REFERENCES dbo.entities (eid),
-    CONSTRAINT fk_class_owner_uid FOREIGN KEY (owner_uid) REFERENCES auth.users (uid)
+    CONSTRAINT fk_class_owner_id FOREIGN KEY (owner_id) REFERENCES auth.users
 );
 
 CREATE TABLE IF NOT EXISTS dbo.co

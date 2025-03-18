@@ -2,9 +2,9 @@ package router
 
 import (
 	"fmt"
+	"i3s-service/hasura"
 	"i3s-service/internal/configs"
 	"i3s-service/internal/services"
-	"i3s-service/migrations"
 	"log"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -36,9 +36,12 @@ func InitAPI(appConfig *configs.Config, service *services.Service) humacli.CLI {
 			Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
 		}))
 
-		err := migrations.MigrateI3S(appConfig)
-		if err != nil {
+		if err := hasura.MigrateI3S(appConfig); err != nil {
 			log.Fatalf("failed to migrate database: %v\n", err)
+		}
+
+		if err := hasura.PostI3SMetadata(appConfig); err != nil {
+			log.Fatalf("failed to post metadata: %v\n", err)
 		}
 
 		// api := humafiber.New(app, humaConfig)
