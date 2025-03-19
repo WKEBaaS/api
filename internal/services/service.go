@@ -3,12 +3,15 @@ package services
 import (
 	"context"
 	"i3s-service/internal/configs"
+	"i3s-service/internal/services/hasura"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Service struct {
-	DB *pgxpool.Pool
+	config *configs.Config
+	DB     *pgxpool.Pool
+	Hasura *hasura.HasuraService
 }
 
 func InitService(config *configs.Config) *Service {
@@ -19,7 +22,9 @@ func InitService(config *configs.Config) *Service {
 	}
 
 	service := &Service{}
+	service.config = config
 	service.DB = db
+	service.Hasura = hasura.InitHasuraService(config)
 
 	return service
 }

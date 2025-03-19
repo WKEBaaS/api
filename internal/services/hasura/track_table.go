@@ -5,13 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"i3s-service/internal/configs"
 	"io"
 	"net/http"
 	"time"
 )
 
-type HasuraMetadata struct {
+type HasuraResponse struct {
+	Error string `json:"error"`
+	Path  string `json:"path"`
+	Code  string `json:"code"`
+}
+
+type HasuraTrackTableMetadata struct {
 	Type string `json:"type"`
 	Args struct {
 		Source string `json:"source"`
@@ -37,7 +42,7 @@ type HasuraMetadata struct {
 	} `json:"args"`
 }
 
-func PostHasuraMetadata(hasuraURL string, hasuraSecret string, data any) error {
+func (s *HasuraService) PostTrackTableMetadata(data any) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	jsonData, err := json.Marshal(data)
@@ -48,11 +53,11 @@ func PostHasuraMetadata(hasuraURL string, hasuraSecret string, data any) error {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
-		hasuraURL+"/v1/metadata",
+		s.config.Hasura.URL+"/v1/metadata",
 		bytes.NewBuffer(jsonData))
 
 	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
-	req.Header.Set("X-Hasura-Admin-Secret", hasuraSecret)
+	req.Header.Set("X-Hasura-Admin-Secret", s.config.Hasura.Secret)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -66,17 +71,46 @@ func PostHasuraMetadata(hasuraURL string, hasuraSecret string, data any) error {
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
 
+		hasuraResp := &HasuraResponse{}
+		if err := json.Unmarshal(body, &hasuraResp); err != nil {
+			return fmt.Errorf( //nolint: goerr113
+				"status_code: %d\nresponse: %s",
+				resp.StatusCode,
+				body,
+			)
+		}
+
+		if hasuraResp.Code == "already-tracked" || hasuraResp.Code == "already-exists" {
+			return nil
+		}
+
 		return fmt.Errorf("failed to post request: status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
 }
 
-func PostI3SMetadata(config *configs.Config) error {
+func (s *HasuraService) PostTrackTableMetadataWithTableName(schema string, tableSingular string, tablePlural string) error {
+	meta := &HasuraTrackTableMetadata{}
 
-	if err := postAuthUserMetadata(config); err != nil {
-		return fmt.Errorf("failed to post auth.users metadata: %w", err)
-	}
+	meta.Type = "pg_track_table"
+	meta.Args.Source = s.config.Hasura.Source
 
-	return nil
+	meta.Args.Table.Schema = schema
+	meta.Args.Table.Name = tablePlural
+	meta.Args.Configuration.CustomName = tablePlural
+
+	customRootFields := &meta.Args.Configuration.CustomRootFields
+
+	customRootFields.Select = tablePlural
+	customRootFields.SelectByPk = tableSingular
+	customRootFields.SelectAggregate = fmt.Sprintf("%s_aggregate", tablePlural)
+	customRootFields.Insert = fmt.Sprintf("insert_%s", tablePlural)
+	customRootFields.InsertOne = fmt.Sprintf("insert_%s", tableSingular)
+	customRootFields.Update = fmt.Sprintf("update_%s", tablePlural)
+	customRootFields.UpdateByPk = fmt.Sprintf("update_%s", tableSingular)
+	customRootFields.Delete = fmt.Sprintf("delete_%s", tablePlural)
+	customRootFields.DeleteByPk = fmt.Sprintf("delete_%s", tableSingular)
+
+	return s.PostTrackTableMetadata(meta)
 }

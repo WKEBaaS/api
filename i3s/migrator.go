@@ -1,10 +1,9 @@
-package hasura
+package i3s
 
 import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"i3s-service/internal/configs"
 	"log"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -15,9 +14,9 @@ import (
 //go:embed migrations/*.sql
 var postgresMigrations embed.FS
 
-func MigrateI3S(config *configs.Config) error {
+func (i3s *I3S) Migrate() error {
 	// db, err := pgx.Connect(context.Background(), config.DatabaseURL)
-	db, err := sql.Open("pgx", config.DatabaseURL)
+	db, err := sql.Open("pgx", i3s.config.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
