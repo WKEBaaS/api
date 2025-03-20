@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS dbo.objects
 
 CREATE INDEX IF NOT EXISTS idx_object_chinese_name ON dbo.objects (chinese_name);
 
-CREATE TABLE IF NOT EXISTS dbo.object_relation
+CREATE TABLE IF NOT EXISTS dbo.object_relations
 (
     first_oid   UUID                                  NOT NULL,
     second_oid  UUID                                  NOT NULL,
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS dbo.co
     CONSTRAINT fk_co_oid FOREIGN KEY (oid) REFERENCES dbo.objects (oid)
 );
 
-CREATE TABLE IF NOT EXISTS dbo.inheritance
+CREATE TABLE IF NOT EXISTS dbo.inheritances
 (
     pcid             INT NOT NULL,
     ccid             INT NOT NULL,

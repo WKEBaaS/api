@@ -119,7 +119,7 @@ BEGIN
             RETURNING
                 cid INTO new_class_id;
             -- Insert into inheritance or relevant hierarchy table
-            INSERT INTO dbo.inheritance(pcid, ccid)
+            INSERT INTO dbo.inheritances(pcid, ccid)
             VALUES (parent_class_id_local,
                     new_class_id);
             -- Calculate new level and update the dbo.class record
@@ -213,7 +213,7 @@ BEGIN
         FROM dbo.co
         WHERE cid = p_class_id;
         DELETE
-        FROM dbo.inheritance
+        FROM dbo.inheritances
         WHERE ccid = p_class_id
            OR pcid = p_class_id;
         DELETE
