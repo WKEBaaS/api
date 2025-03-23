@@ -36,8 +36,45 @@ func (i3s *I3S) PostMetadata() error {
 	}
 
 	for _, table := range tables {
-		if err := i3s.service.Hasura.PostTrackTableMetadataWithTableName(table.Schema, table.Name, table.SingularName); err != nil {
+		if err := i3s.service.Hasura.TrackTable(table.Schema, table.Name, table.SingularName); err != nil {
 			return err
+		}
+	}
+
+	var relationships = []struct {
+		Schema                 string
+		TableName              string
+		RelationshipName       string
+		ForeignKeyConstraintOn string
+		Comment                *string
+	}{
+		{"dbo", "classes", "owner", "owner_id", nil},
+		{"dbo", "co", "object", "oid", nil},
+		// {"dbo", "classes", "children", "cid", nil},
+	}
+
+	for _, r := range relationships {
+		if err := i3s.service.Hasura.CreateRelationship(r.Schema, r.TableName, r.RelationshipName, r.ForeignKeyConstraintOn, r.Comment); err != nil {
+			return err
+		}
+	}
+
+	var arrayRelationships = []struct {
+		Schema                string
+		TableName             string
+		RelationshipName      string
+		ForeignKeyTableSchema string
+		ForeignKeyTableName   string
+		ForeignKeyColumns     []string
+		Comment               *string
+	}{
+		{"dbo", "classes", "children", "dbo", "inheritances", []string{"pcid"}, nil},
+		{"dbo", "classes", "parent", "dbo", "inheritances", []string{"ccid"}, nil},
+		{"dbo", "classes", "co", "dbo", "co", []string{"cid"}, nil},
+	}
+
+	for _, r := range arrayRelationships {
+		if err := i3s.service.Hasura.CreateArrayRelationship(r.Schema, r.TableName, r.RelationshipName, r.ForeignKeyTableSchema, r.ForeignKeyTableName, r.ForeignKeyColumns, r.Comment); err != nil {
 		}
 	}
 

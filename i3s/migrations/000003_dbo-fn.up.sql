@@ -111,7 +111,7 @@ BEGIN
             INSERT INTO dbo.classes(entity_id,
                                   chinese_name,
                                   chinese_description,
-                                  owner_uid)
+                                  owner_id)
             VALUES (_entity_id,
                     _chinese_name,
                     _chinese_description,

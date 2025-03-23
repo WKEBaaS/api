@@ -1,22 +1,10 @@
 package hasura
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/samber/lo"
 )
-
-type HasuraResponse struct {
-	Error string `json:"error"`
-	Path  string `json:"path"`
-	Code  string `json:"code"`
-}
 
 type HasuraTrackTableMetadata struct {
 	Type string `json:"type"`
@@ -44,55 +32,7 @@ type HasuraTrackTableMetadata struct {
 	} `json:"args"`
 }
 
-func (s *HasuraService) PostTrackTableMetadata(data any) error {
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal data: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(
-		context.Background(),
-		http.MethodPost,
-		s.config.Hasura.URL+"/v1/metadata",
-		bytes.NewBuffer(jsonData))
-
-	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
-	req.Header.Set("X-Hasura-Admin-Secret", s.config.Hasura.Secret)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to post request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read response body: %w", err)
-		}
-
-		hasuraResp := &HasuraResponse{}
-		if err := json.Unmarshal(body, &hasuraResp); err != nil {
-			return fmt.Errorf( //nolint: goerr113
-				"status_code: %d\nresponse: %s",
-				resp.StatusCode,
-				body,
-			)
-		}
-
-		if hasuraResp.Code == "already-tracked" || hasuraResp.Code == "already-exists" {
-			return nil
-		}
-
-		return fmt.Errorf("failed to post request: status code: %d, body: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// PostTrackTableMetadataWithTableName tracks a table in Hasura with the given schema and table names.
+// TrackTable tracks a table in Hasura with the given schema and table names.
 //
 // Parameters:
 // - schema: The schema name where the table resides.
@@ -102,7 +42,7 @@ func (s *HasuraService) PostTrackTableMetadata(data any) error {
 // The function requires both singular and plural forms of the table name to correctly set up
 // custom root fields in Hasura. These fields are used to generate GraphQL queries and mutations
 // that follow a consistent naming convention, making it easier to interact with the API.
-func (s *HasuraService) PostTrackTableMetadataWithTableName(schema string, tableName string, tableSingularName *string) error {
+func (s *HasuraService) TrackTable(schema string, tableName string, tableSingularName *string) error {
 	meta := &HasuraTrackTableMetadata{}
 
 	meta.Type = "pg_track_table"
@@ -127,5 +67,5 @@ func (s *HasuraService) PostTrackTableMetadataWithTableName(schema string, table
 		customRootFields.DeleteByPk = lo.ToPtr(fmt.Sprintf("delete_%s", *tableSingularName))
 	}
 
-	return s.PostTrackTableMetadata(meta)
+	return s.PostMetadata(meta)
 }
