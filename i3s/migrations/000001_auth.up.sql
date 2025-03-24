@@ -18,10 +18,9 @@ CREATE TABLE auth.users
     last_sign_in_at      timestamptz  NULL,
     raw_app_meta_data    jsonb        NULL,
     raw_user_meta_data   jsonb        NULL,
-    is_super_admin       bool         NULL,
     created_at           timestamptz DEFAULT CURRENT_TIMESTAMP,
     updated_at           timestamptz DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pk_user PRIMARY KEY (id)
+    CONSTRAINT pk_auth_user PRIMARY KEY (id)
 );
 
 -- CREATE INDEX users_instance_id_email_idx ON auth.user USING btree (instance_id, email);
@@ -80,22 +79,29 @@ CREATE INDEX user_id_created_at_idx
     ON auth.sessions (user_id, created_at);
 
 
-
 CREATE TABLE auth.audit_log_entries
 (
 --     instance_id uuid,
-    id         uuid                                      NOT NULL
-        PRIMARY KEY,
+    id         uuid                                      NOT NULL,
     payload    json,
     created_at TIMESTAMP WITH TIME ZONE,
-    ip_address VARCHAR(64) DEFAULT ''::CHARACTER VARYING NOT NULL
+    ip_address VARCHAR(64) DEFAULT ''::CHARACTER VARYING NOT NULL,
+    CONSTRAINT pk_auth_audit_log_entries PRIMARY KEY (id)
 );
 
 COMMENT
     ON TABLE auth.audit_log_entries IS 'Auth: Audit trail for user actions.';
--- create index audit_logs_instance_id_idx
---     on audit_log_entries (instance_id);
 
+CREATE TABLE auth.roles
+(
+    id          uuid         NOT NULL,
+    name        VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at  timestamptz DEFAULT CURRENT_TIMESTAMP,
+    updated_at  timestamptz DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_auth_role PRIMARY KEY (id),
+    CONSTRAINT uq_auth_role_name UNIQUE (name)
+);
 
 -- Gets the User ID from the request cookie
 CREATE
