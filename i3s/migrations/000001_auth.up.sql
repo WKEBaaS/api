@@ -1,7 +1,7 @@
 CREATE TABLE auth.users
 (
 --     instance_id          uuid         NULL,
-    id                   uuid         NOT NULL UNIQUE,
+    id                   uuid         NOT NULL DEFAULT uuid_generate_v4() UNIQUE,
     aud                  VARCHAR(255) NULL,
     "role"               VARCHAR(255) NULL,
     email                VARCHAR(255) NULL UNIQUE,
@@ -18,8 +18,8 @@ CREATE TABLE auth.users
     last_sign_in_at      timestamptz  NULL,
     raw_app_meta_data    jsonb        NULL,
     raw_user_meta_data   jsonb        NULL,
-    created_at           timestamptz DEFAULT CURRENT_TIMESTAMP,
-    updated_at           timestamptz DEFAULT CURRENT_TIMESTAMP,
+    created_at           timestamptz           DEFAULT CURRENT_TIMESTAMP,
+    updated_at           timestamptz           DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_auth_user PRIMARY KEY (id)
 );
 
@@ -94,13 +94,26 @@ COMMENT
 
 CREATE TABLE auth.roles
 (
-    id          uuid         NOT NULL,
+    id          uuid         NOT NULL DEFAULT uuid_generate_v4(),
     name        VARCHAR(255) NOT NULL,
     description TEXT,
-    created_at  timestamptz DEFAULT CURRENT_TIMESTAMP,
-    updated_at  timestamptz DEFAULT CURRENT_TIMESTAMP,
+    created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+    updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_auth_role PRIMARY KEY (id),
     CONSTRAINT uq_auth_role_name UNIQUE (name)
+);
+
+CREATE TABLE auth.user_roles
+(
+    user_id    uuid NOT NULL
+        REFERENCES auth.users
+            ON DELETE CASCADE,
+    role_id    uuid NOT NULL
+        REFERENCES auth.roles
+            ON DELETE CASCADE,
+    created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_auth_user_role PRIMARY KEY (user_id, role_id)
 );
 
 -- Gets the User ID from the request cookie

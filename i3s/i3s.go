@@ -29,6 +29,8 @@ func (i3s *I3S) PostMetadata() error {
 		{"auth", "identities", lo.ToPtr("identity")},
 		{"auth", "sessions", lo.ToPtr("session")},
 		{"auth", "audit_log_entries", lo.ToPtr("audit_log_entry")},
+		{"auth", "roles", lo.ToPtr("role")},
+		{"auth", "user_roles", lo.ToPtr("user_role")},
 		{"dbo", "classes", lo.ToPtr("class")},
 		{"dbo", "objects", lo.ToPtr("object")},
 		{"dbo", "inheritances", lo.ToPtr("inheritance")},
@@ -48,9 +50,9 @@ func (i3s *I3S) PostMetadata() error {
 		ForeignKeyConstraintOn string
 		Comment                *string
 	}{
+		{"auth", "user_roles", "role", "role_id", nil},
 		{"dbo", "classes", "owner", "owner_id", nil},
 		{"dbo", "co", "object", "oid", nil},
-		// {"dbo", "classes", "children", "cid", nil},
 	}
 
 	for _, r := range relationships {
@@ -68,6 +70,8 @@ func (i3s *I3S) PostMetadata() error {
 		ForeignKeyColumns     []string
 		Comment               *string
 	}{
+		{"auth", "users", "roles", "auth", "user_roles", []string{"user_id"}, nil},
+		{"auth", "roles", "users", "auth", "users", []string{"role_id"}, nil},
 		{"dbo", "classes", "children", "dbo", "inheritances", []string{"pcid"}, nil},
 		{"dbo", "classes", "parent", "dbo", "inheritances", []string{"ccid"}, nil},
 		{"dbo", "classes", "co", "dbo", "co", []string{"cid"}, nil},
