@@ -1,7 +1,7 @@
 CREATE TABLE auth.users
 (
 --     instance_id          uuid         NULL,
-    id                   uuid         NOT NULL DEFAULT uuid_generate_v4() UNIQUE,
+    id                   VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
     aud                  VARCHAR(255) NULL,
     "role"               VARCHAR(255) NULL,
     email                VARCHAR(255) NULL UNIQUE,
@@ -29,19 +29,18 @@ COMMENT ON TABLE auth.users IS 'Auth: Stores user login data within a secure sch
 
 CREATE TABLE auth.identities
 (
-    id              uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
-    provider_id     TEXT                            NOT NULL,
-    user_id         uuid                            NOT NULL
-        REFERENCES auth.users
-            ON DELETE CASCADE,
-    identity_data   jsonb                           NOT NULL,
-    provider        TEXT                            NOT NULL,
+    id              VARCHAR(21) NOT NULL DEFAULT nanoid() UNIQUE,
+    provider_id     TEXT        NOT NULL,
+    user_id         VARCHAR(21) NOT NULL,
+    identity_data   jsonb       NOT NULL,
+    provider        TEXT        NOT NULL,
     last_sign_in_at timestamptz,
     created_at      timestamptz,
     updated_at      timestamptz,
     email           TEXT GENERATED ALWAYS AS (LOWER((identity_data ->> 'email'::TEXT))) STORED,
-    CONSTRAINT uq_identities_provider_id_provider
-        UNIQUE (provider_id, provider)
+    CONSTRAINT pk_auth_idp PRIMARY KEY (id),
+    CONSTRAINT fk_auth_idp_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
+    CONSTRAINT uq_auth_idp_id UNIQUE (provider_id, provider)
 );
 COMMENT ON TABLE auth.identities IS 'Auth: Stores identities associated to a user.';
 
@@ -50,10 +49,8 @@ COMMENT ON TYPE auth.aal_level IS 'Auth: The level of assurance for a user sessi
 
 CREATE TABLE auth.sessions
 (
-    id           uuid NOT NULL PRIMARY KEY,
-    user_id      uuid NOT NULL
-        REFERENCES auth.users
-            ON DELETE CASCADE,
+    id           VARCHAR(21) NOT NULL DEFAULT nanoid() UNIQUE,
+    user_id      varchar(21)        NOT NULL,
     created_at   timestamptz,
     updated_at   timestamptz,
     factor_id    uuid,
@@ -62,7 +59,9 @@ CREATE TABLE auth.sessions
     refreshed_at TIMESTAMP,
     user_agent   TEXT,
     ip           inet,
-    tag          TEXT
+    tag          TEXT,
+    CONSTRAINT pk_auth_sessions PRIMARY KEY (id),
+    CONSTRAINT fk_auth_sessions_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE
 );
 COMMENT
     ON TABLE auth.sessions IS 'Auth: Stores session data associated to a user.';
@@ -82,10 +81,10 @@ CREATE INDEX user_id_created_at_idx
 CREATE TABLE auth.audit_log_entries
 (
 --     instance_id uuid,
-    id         uuid                                      NOT NULL,
+    id         VARCHAR(21) NOT NULL DEFAULT nanoid() UNIQUE,
     payload    json,
     created_at TIMESTAMP WITH TIME ZONE,
-    ip_address VARCHAR(64) DEFAULT ''::CHARACTER VARYING NOT NULL,
+    ip_address VARCHAR(64)          DEFAULT ''::CHARACTER VARYING NOT NULL,
     CONSTRAINT pk_auth_audit_log_entries PRIMARY KEY (id)
 );
 
@@ -94,7 +93,7 @@ COMMENT
 
 CREATE TABLE auth.roles
 (
-    id          uuid         NOT NULL DEFAULT uuid_generate_v4(),
+    id          VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
     name        VARCHAR(255) NOT NULL,
     description TEXT,
     created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
@@ -105,15 +104,13 @@ CREATE TABLE auth.roles
 
 CREATE TABLE auth.user_roles
 (
-    user_id    uuid NOT NULL
-        REFERENCES auth.users
-            ON DELETE CASCADE,
-    role_id    uuid NOT NULL
-        REFERENCES auth.roles
-            ON DELETE CASCADE,
+    user_id    VARCHAR(21) NOT NULL,
+    role_id    VARCHAR(21) NOT NULL,
     created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pk_auth_user_role PRIMARY KEY (user_id, role_id)
+    CONSTRAINT pk_auth_user_role PRIMARY KEY (user_id, role_id),
+    CONSTRAINT fk_auth_user_role_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
+    CONSTRAINT fk_auth_user_role_role_id FOREIGN KEY (role_id) REFERENCES auth.roles ON DELETE CASCADE
 );
 
 -- Gets the User ID from the request cookie
