@@ -1,10 +1,10 @@
-CREATE OR REPLACE FUNCTION dbo.fn_get_name_path(_parent_class_id INT, _chinese_name VARCHAR(255))
-    RETURNS VARCHAR(900)
+CREATE OR REPLACE FUNCTION dbo.fn_get_name_path(_parent_class_id VARCHAR(21), _chinese_name VARCHAR(255) DEFAULT NULL)
+    RETURNS VARCHAR(2300)
 AS
 $$
 DECLARE
     hierarchy_level INT;
-    name_path       VARCHAR(900);
+    name_path       VARCHAR(2300);
 BEGIN
     -- Check if _chinese_name is NULL
     IF _chinese_name IS NULL THEN
@@ -23,10 +23,10 @@ BEGIN
     -- Determine name_path based on the hierarchy_level
     IF hierarchy_level = 0 THEN
         -- Root level uses the chinese_name directly
-        name_path := _chinese_name;
+        name_path := '/' || _chinese_name;
     ELSE
         -- Concatenate the parent's name_path and current node's chinese_name
-        SELECT c.name_path || '/' || _chinese_name
+        SELECT FORMAT('%s/%s', c.name_path, _chinese_name)
         INTO name_path
         FROM dbo.classes c
         WHERE c.id = _parent_class_id;
@@ -37,8 +37,8 @@ END;
 $$
     LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION dbo.fn_get_id_path(_parent_class_id INT, _class_id INT)
-    RETURNS VARCHAR(900)
+CREATE OR REPLACE FUNCTION dbo.fn_get_id_path(_parent_class_id VARCHAR(21), _class_id VARCHAR(21) DEFAULT NULL)
+    RETURNS VARCHAR(2300)
 AS
 $$
 DECLARE
@@ -54,6 +54,7 @@ BEGIN
         WHERE c.id = _parent_class_id;
         RETURN id_path;
     END IF;
+
     -- Retrieve the hierarchy level of the parent class
     SELECT c.hierarchy_level
     INTO hierarchy_level
@@ -62,10 +63,10 @@ BEGIN
     -- Check if the hierarchy_level is 0
     IF hierarchy_level = 0 THEN
         -- If root level, the id_path is just the current class_id
-        id_path := CAST(_class_id AS VARCHAR);
+        id_path := _class_id;
     ELSE
         -- Concatenate the parent's id_path and the current class_id
-        SELECT COALESCE(c.id_path, '') || '/' || CAST(_class_id AS VARCHAR)
+        SELECT FORMAT('%s/%s', COALESCE(c.id_path, ''), COALESCE(_class_id, ''))
         INTO id_path
         FROM dbo.classes c
         WHERE c.id = _parent_class_id;
@@ -76,18 +77,22 @@ END;
 $$
     LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION dbo.fn_insert_class(_parent_class_id INT, _entity_id INT, _chinese_name VARCHAR(256),
-                                               _chinese_description VARCHAR(4000), _owner_id uuid)
-    RETURNS INT
+CREATE OR REPLACE FUNCTION dbo.fn_insert_class(
+    _parent_class_id VARCHAR(21),
+    _entity_id VARCHAR(21),
+    _chinese_name VARCHAR(256),
+    _chinese_description VARCHAR(4000),
+    _owner_id VARCHAR(21) DEFAULT NULL)
+    RETURNS VARCHAR(2300)
 AS
 $$
 DECLARE
-    new_class_id          INT;
-    parent_class_id_local INT;
-    parent_name_path      VARCHAR(450);
-    new_name_path         VARCHAR(450);
+    new_class_id          VARCHAR(21);
+    parent_class_id_local VARCHAR(21);
+    parent_name_path      TEXT;
+    new_name_path         TEXT;
     new_level             SMALLINT;
-    new_id_path           VARCHAR(900);
+    new_id_path           TEXT;
     error_message         TEXT;
     error_context         TEXT;
 BEGIN
@@ -164,12 +169,11 @@ END;
 $$
     LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION dbo.fn_insert_entity(
-    IN p_chinese_name VARCHAR(50) DEFAULT NULL,
-    IN p_english_name VARCHAR(50) DEFAULT NULL,
-    IN p_is_relational BOOLEAN DEFAULT NULL,
-    IN p_custom_rank INT DEFAULT NULL
-) RETURNS VARCHAR(21)
+CREATE OR REPLACE FUNCTION dbo.fn_insert_entity(p_chinese_name CHARACTER VARYING DEFAULT NULL::CHARACTER VARYING,
+                                                p_english_name CHARACTER VARYING DEFAULT NULL::CHARACTER VARYING,
+                                                p_is_relational BOOLEAN DEFAULT NULL::BOOLEAN,
+                                                p_custom_rank INTEGER DEFAULT NULL::INTEGER
+) RETURNS CHARACTER VARYING(21)
     LANGUAGE plpgsql
 AS
 $$
@@ -190,13 +194,27 @@ BEGIN
     END IF;
 
     -- 插入數據到 entities 表中並返回新插入的 ID
-    INSERT INTO dbo.entities(chinese_name,
-                             english_name,
-                             is_relational)
-    VALUES (p_chinese_name,
-            p_english_name,
-            p_is_relational)
-    RETURNING id INTO entity_id;
+    -- 如果有提供 p_custom_rank，則使用它來覆蓋系統默認值
+    IF p_custom_rank IS NOT NULL THEN
+        INSERT INTO dbo.entities(chinese_name,
+                                 english_name,
+                                 is_relational,
+                                 rank)
+            OVERRIDING SYSTEM VALUE
+        VALUES (p_chinese_name,
+                p_english_name,
+                p_is_relational,
+                p_custom_rank)
+        RETURNING id INTO entity_id;
+    ELSE
+        INSERT INTO dbo.entities(chinese_name,
+                                 english_name,
+                                 is_relational)
+        VALUES (p_chinese_name,
+                p_english_name,
+                p_is_relational)
+        RETURNING id INTO entity_id;
+    END IF;
 
     -- 返回新插入的 entity_id
     RETURN entity_id;
@@ -204,7 +222,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION dbo.fn_delete_class(
-    IN p_class_id INT
+    IN p_class_id VARCHAR(21)
 ) RETURNS VOID
     LANGUAGE plpgsql
 AS
@@ -221,10 +239,12 @@ BEGIN
         DELETE
         FROM dbo.co
         WHERE cid = p_class_id;
+
         DELETE
         FROM dbo.inheritances
         WHERE ccid = p_class_id
            OR pcid = p_class_id;
+
         DELETE
         FROM dbo.classes
         WHERE id = p_class_id;

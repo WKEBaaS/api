@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS dbo.inheritances
     rank             SMALLINT,
     membership_grade INT,
     CONSTRAINT pk_dbo_inheritance PRIMARY KEY (pcid, ccid),
-    CONSTRAINT fk_dbo_inheritance_pcid FOREIGN KEY (pcid) REFERENCES dbo.classes,
-    CONSTRAINT fk_dbo_inheritance_ccid FOREIGN KEY (ccid) REFERENCES dbo.classes
+    CONSTRAINT fk_dbo_inheritance_pcid FOREIGN KEY (pcid) REFERENCES dbo.classes ON DELETE CASCADE,
+    CONSTRAINT fk_dbo_inheritance_ccid FOREIGN KEY (ccid) REFERENCES dbo.classes ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS dbo.permissions
@@ -105,7 +105,8 @@ CREATE TABLE IF NOT EXISTS dbo.permissions
     role_type       BOOLEAN            NOT NULL,
     role_id         uuid               NOT NULL,
     permission_bits SMALLINT DEFAULT 1 NOT NULL,
-    CONSTRAINT uq_dbo_permissions UNIQUE (class_id, role_type, role_id)
+    CONSTRAINT uq_dbo_permissions UNIQUE (class_id, role_type, role_id),
+    CONSTRAINT fk_dbo_permissions_class_id FOREIGN KEY (class_id) REFERENCES dbo.classes ON DELETE CASCADE
 );
 
 COMMENT ON COLUMN dbo.permissions.role_type IS '0表示是群組，1表示是使用者';
