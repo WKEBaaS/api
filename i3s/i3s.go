@@ -35,7 +35,9 @@ func (i3s *I3S) PostMetadata() error {
 		{"dbo", "objects", lo.ToPtr("object")},
 		{"dbo", "inheritances", lo.ToPtr("inheritance")},
 		{"dbo", "co", nil},
-		{"dbo", "text_result", nil},
+		{"api", "class_permission_enum", nil},
+		{"api", "check_class_permission_result", nil},
+		// {"dbo", "text_result", nil},
 	}
 
 	for _, table := range tables {
@@ -87,12 +89,13 @@ func (i3s *I3S) PostMetadata() error {
 	var functions = []struct {
 		Schema       string
 		FunctionName string
-		SessionArg   string
+		SessionArg   *string
 		ExposedAs    *string
 		Comment      *string
 	}{
 		// {"dbo", "fn_insert_class", "hasura_session", lo.ToPtr("mutation"), lo.ToPtr("Insert a new class")},
-		{"dbo", "get_session_role", "hasura_session", nil, lo.ToPtr("Get session role")},
+		// {"dbo", "get_session_role", "hasura_session", nil, lo.ToPtr("Get session role")},
+		{"api", "check_class_permission", lo.ToPtr("hasura_session"), nil, lo.ToPtr("Check user's class permission")},
 	}
 
 	for _, f := range functions {

@@ -1,7 +1,6 @@
 CREATE TABLE auth.users
 (
     id                   VARCHAR(21)  NOT NULL UNIQUE,
-    aud                  VARCHAR(255) NULL,
     "role"               VARCHAR(255) NULL,
     email                VARCHAR(255) NULL UNIQUE,
     encrypted_password   VARCHAR(255) NULL,
@@ -23,6 +22,7 @@ CREATE TABLE auth.users
 -- CREATE INDEX users_instance_id_email_idx ON auth.user USING btree (instance_id, email);
 -- CREATE INDEX users_instance_id_idx ON auth.user USING btree (instance_id);
 COMMENT ON TABLE auth.users IS 'Auth: Stores user login data within a secure schema.';
+COMMENT ON COLUMN auth.users.role IS 'Auth: will be used for hasura request header x-hasura-default-role';
 
 CREATE TABLE auth.identities
 (
@@ -134,30 +134,9 @@ CREATE TABLE auth.user_groups
     CONSTRAINT fk_auth_user_group_group_id FOREIGN KEY (group_id) REFERENCES auth.groups ON DELETE CASCADE
 );
 
--- Gets the User ID from the request cookie
-CREATE
-    OR REPLACE FUNCTION auth.uid() RETURNS uuid AS
-$$
-SELECT NULLIF(CURRENT_SETTING('request.jwt.claims.sub', TRUE), '') ::uuid;
-$$
-    LANGUAGE sql STABLE;
 
--- Gets the User ID from the request cookie
-CREATE
-    OR REPLACE FUNCTION auth.role() RETURNS TEXT AS
-$$
-SELECT NULLIF(CURRENT_SETTING('request.jwt.claims.role', TRUE), '') ::TEXT;
-$$
-    LANGUAGE sql STABLE;
-COMMENT
-    ON FUNCTION auth.role() IS 'Auth: Returns the role of the current user.';
-
--- Gets the User email
-CREATE
-    OR REPLACE FUNCTION auth.email() RETURNS TEXT AS
-$$
-SELECT NULLIF(CURRENT_SETTING('request.jwt.claims.email', TRUE), '') ::TEXT;
-$$
-    LANGUAGE sql STABLE;
-COMMENT
-    ON FUNCTION auth.email() IS 'Auth: Returns the email of the current user.';
+-- Auth tuples
+INSERT INTO auth.roles (name, description)
+VALUES ('admin', 'Admin role'),
+       ('user', 'User role'),
+       ('guest', 'Guest role');

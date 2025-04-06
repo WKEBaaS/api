@@ -9,14 +9,14 @@ type HasuraTrackFunctionMetadata struct {
 			Name   string `json:"name"`
 		} `json:"function"`
 		Configuration struct {
-			SessionArgument string  `json:"session_argument"`
+			SessionArgument *string `json:"session_argument"`
 			ExposedAs       *string `json:"exposed_as"`
 		} `json:"configuration"`
 		Comment *string `json:"comment"`
 	} `json:"args"`
 }
 
-func (s *HasuraService) TrackFunction(schema string, functionName string, sessionArgument string, exposedAs *string, comment *string) error {
+func (s *HasuraService) TrackFunction(schema string, functionName string, sessionArgument *string, exposedAs *string, comment *string) error {
 	meta := &HasuraTrackFunctionMetadata{}
 
 	meta.Type = "pg_track_function"

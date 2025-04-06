@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS dbo.permissions
 (
     class_id        VARCHAR(21)        NOT NULL,
     role_type       BOOLEAN            NOT NULL,
-    role_id         uuid               NOT NULL,
+    role_id         VARCHAR(21)        NOT NULL,
     permission_bits SMALLINT DEFAULT 1 NOT NULL,
     CONSTRAINT uq_dbo_permissions UNIQUE (class_id, role_type, role_id),
     CONSTRAINT fk_dbo_permissions_class_id FOREIGN KEY (class_id) REFERENCES dbo.classes ON DELETE CASCADE
