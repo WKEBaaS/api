@@ -1,7 +1,6 @@
 CREATE TABLE auth.users
 (
---     instance_id          uuid         NULL,
-    id                   VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
+    id                   VARCHAR(21)  NOT NULL UNIQUE,
     aud                  VARCHAR(255) NULL,
     "role"               VARCHAR(255) NULL,
     email                VARCHAR(255) NULL UNIQUE,
@@ -18,8 +17,6 @@ CREATE TABLE auth.users
     last_sign_in_at      timestamptz  NULL,
     raw_app_meta_data    jsonb        NULL,
     raw_user_meta_data   jsonb        NULL,
-    created_at           timestamptz           DEFAULT CURRENT_TIMESTAMP,
-    updated_at           timestamptz           DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_auth_user PRIMARY KEY (id)
 );
 
@@ -50,7 +47,7 @@ COMMENT ON TYPE auth.aal_level IS 'Auth: The level of assurance for a user sessi
 CREATE TABLE auth.sessions
 (
     id           VARCHAR(21) NOT NULL DEFAULT nanoid() UNIQUE,
-    user_id      varchar(21)        NOT NULL,
+    user_id      VARCHAR(21) NOT NULL,
     created_at   timestamptz,
     updated_at   timestamptz,
     factor_id    uuid,
@@ -98,6 +95,7 @@ CREATE TABLE auth.roles
     description TEXT,
     created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
     updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+    is_enabled  BOOLEAN               DEFAULT TRUE,
     CONSTRAINT pk_auth_role PRIMARY KEY (id),
     CONSTRAINT uq_auth_role_name UNIQUE (name)
 );
@@ -111,6 +109,29 @@ CREATE TABLE auth.user_roles
     CONSTRAINT pk_auth_user_role PRIMARY KEY (user_id, role_id),
     CONSTRAINT fk_auth_user_role_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
     CONSTRAINT fk_auth_user_role_role_id FOREIGN KEY (role_id) REFERENCES auth.roles ON DELETE CASCADE
+);
+
+CREATE TABLE auth.groups
+(
+    id          VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
+    name        VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+    updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+    is_enabled  BOOLEAN               DEFAULT TRUE,
+    CONSTRAINT pk_auth_group PRIMARY KEY (id),
+    CONSTRAINT uq_auth_group_name UNIQUE (name)
+);
+
+CREATE TABLE auth.user_groups
+(
+    user_id    VARCHAR(21) NOT NULL,
+    group_id   VARCHAR(21) NOT NULL,
+    created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_auth_user_group PRIMARY KEY (user_id, group_id),
+    CONSTRAINT fk_auth_user_group_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
+    CONSTRAINT fk_auth_user_group_group_id FOREIGN KEY (group_id) REFERENCES auth.groups ON DELETE CASCADE
 );
 
 -- Gets the User ID from the request cookie

@@ -35,6 +35,7 @@ func (i3s *I3S) PostMetadata() error {
 		{"dbo", "objects", lo.ToPtr("object")},
 		{"dbo", "inheritances", lo.ToPtr("inheritance")},
 		{"dbo", "co", nil},
+		{"dbo", "text_result", nil},
 	}
 
 	for _, table := range tables {
@@ -70,8 +71,8 @@ func (i3s *I3S) PostMetadata() error {
 		ForeignKeyColumns     []string
 		Comment               *string
 	}{
-		{"auth", "users", "roles", "auth", "user_roles", []string{"user_id"}, nil},
-		{"auth", "roles", "users", "auth", "users", []string{"role_id"}, nil},
+		// {"auth", "users", "roles", "auth", "user_roles", []string{"user_id"}, nil},
+		// {"auth", "roles", "users", "auth", "users", []string{"role_id"}, nil},
 		{"dbo", "classes", "children", "dbo", "inheritances", []string{"pcid"}, nil},
 		{"dbo", "classes", "parent", "dbo", "inheritances", []string{"ccid"}, nil},
 		{"dbo", "classes", "co", "dbo", "co", []string{"cid"}, nil},
@@ -79,6 +80,24 @@ func (i3s *I3S) PostMetadata() error {
 
 	for _, r := range arrayRelationships {
 		if err := i3s.service.Hasura.CreateArrayRelationship(r.Schema, r.TableName, r.RelationshipName, r.ForeignKeyTableSchema, r.ForeignKeyTableName, r.ForeignKeyColumns, r.Comment); err != nil {
+			return err
+		}
+	}
+
+	var functions = []struct {
+		Schema       string
+		FunctionName string
+		SessionArg   string
+		ExposedAs    *string
+		Comment      *string
+	}{
+		// {"dbo", "fn_insert_class", "hasura_session", lo.ToPtr("mutation"), lo.ToPtr("Insert a new class")},
+		{"dbo", "get_session_role", "hasura_session", nil, lo.ToPtr("Get session role")},
+	}
+
+	for _, f := range functions {
+		if err := i3s.service.Hasura.TrackFunction(f.Schema, f.FunctionName, f.SessionArg, f.ExposedAs, f.Comment); err != nil {
+			return err
 		}
 	}
 

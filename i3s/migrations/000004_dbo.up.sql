@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS dbo.objects
     CONSTRAINT fk_dbo_objects_owner_id FOREIGN KEY (owner_id) REFERENCES auth.users
 );
 
+ALTER TABLE auth.users
+    ADD CONSTRAINT
+        fk_auth_users_id FOREIGN KEY (id) REFERENCES dbo.objects;
+
 CREATE INDEX IF NOT EXISTS idx_object_chinese_name ON dbo.objects (chinese_name);
 
 CREATE TABLE IF NOT EXISTS dbo.object_relations
