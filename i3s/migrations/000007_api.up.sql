@@ -11,6 +11,10 @@ $$
 DECLARE
     v_user_id VARCHAR(21) := hasura_session ->> 'x-hasura-user-id';
 BEGIN
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'x-hasura-user-id is null' USING ERRCODE = '22000';
+    END IF;
+
     RETURN QUERY SELECT TRUE
                  FROM auth.user_roles ur
                           JOIN auth.roles r ON r.id = ur.role_id
@@ -37,6 +41,10 @@ DECLARE
     v_user_id        VARCHAR(21) := hasura_session ->> 'x-hasura-user-id';
     v_permission_bit SMALLINT;
 BEGIN
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'x-hasura-user-id is null' USING ERRCODE = '22000';
+    END IF;
+
     IF hasura_session ->> 'x-hasura-role' = 'admin' THEN
         RETURN QUERY SELECT TRUE;
         RETURN;
@@ -55,7 +63,7 @@ BEGIN
 
     IF NOT found THEN
         RAISE EXCEPTION 'Permission % not found', permission
-            USING ERRCODE = 'P0002';
+            USING ERRCODE = '22000';
     END IF;
 
     RETURN QUERY SELECT TRUE
@@ -89,6 +97,11 @@ $$
 
 COMMENT ON FUNCTION api.check_class_permission IS 'Returns true if the user has permission. Otherwise, returns null.';
 
+CREATE TABLE IF NOT EXISTS api.class_result
+(
+    LIKE dbo.classes
+);
+
 CREATE OR REPLACE FUNCTION api.insert_class(
     hasura_session json,
     parent_class_id VARCHAR(21),
@@ -98,7 +111,7 @@ CREATE OR REPLACE FUNCTION api.insert_class(
     english_name VARCHAR(255) DEFAULT NULL,
     english_description TEXT DEFAULT NULL,
     owner_id VARCHAR(21) DEFAULT NULL
-) RETURNS SETOF dbo.classes AS
+) RETURNS SETOF api.class_result AS
 $$
 DECLARE
     has_permission BOOLEAN;
@@ -106,7 +119,7 @@ BEGIN
     SELECT result INTO has_permission FROM api.check_class_permission(hasura_session, parent_class_id, 'insert');
     IF NOT found THEN
         RAISE EXCEPTION 'No % Permission', 'insert'
-            USING ERRCODE = 'P0002';
+            USING ERRCODE = '22000';
     END IF;
 
     RETURN QUERY SELECT *
@@ -121,4 +134,22 @@ BEGIN
                       );
 END;
 $$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql VOLATILE;
+
+CREATE OR REPLACE FUNCTION api.delete_class(
+    hasura_session json,
+    class_id VARCHAR(21)
+) RETURNS SETOF api.class_result AS
+$$
+DECLARE
+    has_permission BOOLEAN;
+BEGIN
+    SELECT result INTO has_permission FROM api.check_class_permission(hasura_session, class_id, 'delete');
+    IF NOT found THEN
+        RAISE EXCEPTION 'No % Permission', 'delete'
+            USING ERRCODE = '22000';
+    END IF;
+
+    RETURN QUERY SELECT * FROM dbo.fn_delete_class(class_id);
+END;
+$$ LANGUAGE plpgsql VOLATILE;

@@ -142,16 +142,28 @@ VALUES ('admin', 'Admin role'),
        ('user', 'User role'),
        ('guest', 'Guest role');
 
-CREATE OR REPLACE FUNCTION auth.fn_is_role_active(name TEXT)
+CREATE OR REPLACE FUNCTION auth.fn_is_role_active_by_name(TEXT)
     RETURNS BOOLEAN AS
 $$
 BEGIN
     RETURN EXISTS(SELECT 1
                   FROM auth.roles r
-                  WHERE r.name = fn_is_role_active.name
+                  WHERE r.name = $1
                     AND r.deleted_at IS NULL
                     AND r.is_enabled);
 END;
 $$
     LANGUAGE plpgsql
-    STABLE
+    STABLE;
+
+CREATE OR REPLACE FUNCTION auth.fn_is_role_active_by_id(TEXT)
+    RETURNS BOOLEAN AS
+$$
+BEGIN
+    RETURN EXISTS(SELECT 1
+                  FROM auth.roles r
+                  WHERE r.id = $1
+                    AND r.deleted_at IS NULL
+                    AND r.is_enabled);
+END;
+$$ LANGUAGE plpgsql STABLE;

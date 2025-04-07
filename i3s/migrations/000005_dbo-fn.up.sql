@@ -67,7 +67,7 @@ BEGIN
     IF EXISTS(SELECT 1
               FROM dbo.classes
               WHERE name_path = new_name_path) THEN
-        RAISE EXCEPTION 'Error: name_path 已經存在，無法建立 class。NamePath: %', new_name_path USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'Error: name_path 已經存在，無法建立 class。NamePath: %', new_name_path USING ERRCODE = '22000';
     END IF;
 
     IF parent_class_id IS NULL THEN
@@ -78,8 +78,8 @@ BEGIN
         FROM dbo.classes
         WHERE id = parent_class_id;
 
-        IF NOT FOUND THEN
-            RAISE EXCEPTION 'Error: parent_class_id % 不存在，無法建立 class。', parent_class_id USING ERRCODE = 'P0001';
+        IF NOT found THEN
+            RAISE EXCEPTION 'Error: parent_class_id % 不存在，無法建立 class。', parent_class_id USING ERRCODE = '22000';
         END IF;
     END IF;
 
@@ -125,7 +125,7 @@ DECLARE
 BEGIN
     -- 檢查參數是否為空
     IF (p_chinese_name IS NULL OR p_english_name IS NULL OR p_is_relational IS NULL) THEN
-        RAISE EXCEPTION 'Error: 所有參數 (chinese_name, english_name, is_relational) 都必須提供';
+        RAISE EXCEPTION 'Error: 所有參數 (chinese_name, english_name, is_relational) 都必須提供' USING ERRCODE = '22000';
     END IF;
 
     -- 檢查 chinese_name 或 english_name 是否已存在
@@ -133,7 +133,7 @@ BEGIN
               FROM dbo.entities
               WHERE dbo.entities.chinese_name = p_chinese_name
                  OR dbo.entities.english_name = p_english_name) THEN
-        RAISE EXCEPTION 'Error: chinese_name 或 english_name 已經存在，無法建立 entity';
+        RAISE EXCEPTION 'Error: chinese_name 或 english_name 已經存在，無法建立 entity' USING ERRCODE = '22000';
     END IF;
 
     -- 插入數據到 entities 表中並返回新插入的 ID
@@ -165,41 +165,16 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION dbo.fn_delete_class(
-    IN p_class_id VARCHAR(21)
-) RETURNS VOID
+    class_id VARCHAR(21)
+) RETURNS SETOF dbo.classes
     LANGUAGE plpgsql
 AS
 $$
 DECLARE
-    error_message TEXT;
-    error_context TEXT;
 BEGIN
-    -- Check if the class exists
-    IF (SELECT COUNT(*)
-        FROM dbo.classes
-        WHERE id = p_class_id) = 1 THEN
-        -- Delete related records from class_object_relations and inheritances
-        DELETE
-        FROM dbo.co
-        WHERE cid = p_class_id;
-
-        DELETE
-        FROM dbo.inheritances
-        WHERE ccid = p_class_id
-           OR pcid = p_class_id;
-
-        DELETE
-        FROM dbo.classes
-        WHERE id = p_class_id;
-    ELSE
-        -- Raise an error if the class does not exist
-        RAISE EXCEPTION 'Error: This class does not exist';
+    RETURN QUERY DELETE FROM dbo.classes WHERE id = class_id RETURNING *;
+    IF NOT found THEN
+        RAISE EXCEPTION 'Error: class_id % 不存在，無法刪除class。', id USING ERRCODE = '22000';
     END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Capture error details and raise the error with additional context
-        GET STACKED DIAGNOSTICS error_message = MESSAGE_TEXT,
-            error_context = PG_EXCEPTION_CONTEXT;
-        RAISE EXCEPTION 'Error code: %, Error message: %, Context: %', sqlstate, error_message, error_context;
 END;
 $$;

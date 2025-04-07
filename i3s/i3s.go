@@ -38,6 +38,8 @@ func (i3s *I3S) PostMetadata() error {
 		{"dbo", "inheritances", lo.ToPtr("inheritance")},
 		{"dbo", "co", nil},
 		{"api", "check_class_permission_result", nil},
+		{"api", "class_result", nil},
+		{"api", "has_role_result", nil},
 		// {"dbo", "text_result", nil},
 	}
 
@@ -97,7 +99,9 @@ func (i3s *I3S) PostMetadata() error {
 		// {"dbo", "fn_insert_class", "hasura_session", lo.ToPtr("mutation"), lo.ToPtr("Insert a new class")},
 		// {"dbo", "get_session_role", "hasura_session", nil, lo.ToPtr("Get session role")},
 		{"api", "check_class_permission", lo.ToPtr("hasura_session"), nil, lo.ToPtr("Check user's class permission")},
-		{"api", "insert_class", lo.ToPtr("hasura_session"), nil, lo.ToPtr("Insert a new class")},
+		{"api", "insert_class", lo.ToPtr("hasura_session"), lo.ToPtr("mutation"), lo.ToPtr("Insert a new class")},
+		{"api", "delete_class", lo.ToPtr("hasura_session"), lo.ToPtr("mutation"), lo.ToPtr("Delete the class")},
+		{"api", "has_role", lo.ToPtr("hasura_session"), nil, lo.ToPtr("Check if the user has a role")},
 	}
 
 	for _, f := range functions {
