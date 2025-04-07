@@ -58,17 +58,17 @@ CREATE TABLE IF NOT EXISTS dbo.classes
     chinese_description VARCHAR(4000),
     english_name        VARCHAR(256),
     english_description VARCHAR(4000),
-    id_path             VARCHAR(2300),
-    name_path           VARCHAR(2300),
+    id_path             VARCHAR(2300)             NOT NULL,
+    name_path           VARCHAR(2300)             NOT NULL,
     created_at          timestamptz               NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          timestamptz               NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at          timestamptz,
     object_count        INT         DEFAULT 0     NOT NULL,
     class_rank          SMALLINT    DEFAULT 0     NOT NULL,
     object_rank         SMALLINT    DEFAULT 0     NOT NULL,
-    hierarchy_level     SMALLINT,
+    hierarchy_level     SMALLINT                  NOT NULL,
     click_count         INT         DEFAULT 0     NOT NULL,
-    keywords            TEXT[]      DEFAULT '{}',
+    keywords            TEXT[]      DEFAULT '{}'  NOT NULL,
     owner_id            VARCHAR(21) DEFAULT NULL,
     is_hidden           BOOLEAN     DEFAULT FALSE NOT NULL,
     is_child            BOOLEAN     DEFAULT FALSE NOT NULL,
@@ -113,5 +113,23 @@ CREATE TABLE IF NOT EXISTS dbo.permissions
     CONSTRAINT fk_dbo_permissions_class_id FOREIGN KEY (class_id) REFERENCES dbo.classes ON DELETE CASCADE
 );
 
-COMMENT ON COLUMN dbo.permissions.role_type IS '0表示是群組，1表示是使用者';
-COMMENT ON COLUMN dbo.permissions.role_id IS '由RoleType決定值為Auth.Groups.GID或Auth.User.UID';
+COMMENT ON COLUMN dbo.permissions.role_type IS 'True表示是使用者,False表示是群組';
+COMMENT ON COLUMN dbo.permissions.role_id IS '由RoleType決定值為Auth.Roles.ID或Auth.User.ID';
+
+
+CREATE TABLE IF NOT EXISTS dbo.permission_enum
+(
+    id  TEXT,
+    bit SMALLINT NOT NULL,
+    CONSTRAINT pk_permission_enum PRIMARY KEY (id),
+    CONSTRAINT uq_permission_enum UNIQUE (bit)
+);
+
+INSERT INTO dbo.permission_enum(id, bit)
+VALUES ('read-class', 1),
+       ('read-object', 2),
+       ('insert', 4),
+       ('delete', 8),
+       ('update', 16),
+       ('modify', 32),
+       ('subscribe', 64);

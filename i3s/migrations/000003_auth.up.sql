@@ -95,6 +95,7 @@ CREATE TABLE auth.roles
     description TEXT,
     created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
     updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+    deleted_at  timestamptz,
     is_enabled  BOOLEAN               DEFAULT TRUE,
     CONSTRAINT pk_auth_role PRIMARY KEY (id),
     CONSTRAINT uq_auth_role_name UNIQUE (name)
@@ -111,32 +112,46 @@ CREATE TABLE auth.user_roles
     CONSTRAINT fk_auth_user_role_role_id FOREIGN KEY (role_id) REFERENCES auth.roles ON DELETE CASCADE
 );
 
-CREATE TABLE auth.groups
-(
-    id          VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
-    name        VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
-    updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
-    is_enabled  BOOLEAN               DEFAULT TRUE,
-    CONSTRAINT pk_auth_group PRIMARY KEY (id),
-    CONSTRAINT uq_auth_group_name UNIQUE (name)
-);
-
-CREATE TABLE auth.user_groups
-(
-    user_id    VARCHAR(21) NOT NULL,
-    group_id   VARCHAR(21) NOT NULL,
-    created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pk_auth_user_group PRIMARY KEY (user_id, group_id),
-    CONSTRAINT fk_auth_user_group_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
-    CONSTRAINT fk_auth_user_group_group_id FOREIGN KEY (group_id) REFERENCES auth.groups ON DELETE CASCADE
-);
-
+-- CREATE TABLE auth.groups
+-- (
+--     id          VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
+--     name        VARCHAR(255) NOT NULL,
+--     description TEXT,
+--     created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+--     updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
+--     is_enabled  BOOLEAN               DEFAULT TRUE,
+--     CONSTRAINT pk_auth_group PRIMARY KEY (id),
+--     CONSTRAINT uq_auth_group_name UNIQUE (name)
+-- );
+--
+-- CREATE TABLE auth.user_groups
+-- (
+--     user_id    VARCHAR(21) NOT NULL,
+--     group_id   VARCHAR(21) NOT NULL,
+--     created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
+--     updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
+--     CONSTRAINT pk_auth_user_group PRIMARY KEY (user_id, group_id),
+--     CONSTRAINT fk_auth_user_group_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
+--     CONSTRAINT fk_auth_user_group_group_id FOREIGN KEY (group_id) REFERENCES auth.groups ON DELETE CASCADE
+-- );
+--
 
 -- Auth tuples
 INSERT INTO auth.roles (name, description)
 VALUES ('admin', 'Admin role'),
        ('user', 'User role'),
        ('guest', 'Guest role');
+
+CREATE OR REPLACE FUNCTION auth.fn_is_role_active(name TEXT)
+    RETURNS BOOLEAN AS
+$$
+BEGIN
+    RETURN EXISTS(SELECT 1
+                  FROM auth.roles r
+                  WHERE r.name = fn_is_role_active.name
+                    AND r.deleted_at IS NULL
+                    AND r.is_enabled);
+END;
+$$
+    LANGUAGE plpgsql
+    STABLE

@@ -1,171 +1,114 @@
-CREATE OR REPLACE FUNCTION dbo.fn_get_name_path(_parent_class_id VARCHAR(21), _chinese_name VARCHAR(255) DEFAULT NULL)
-    RETURNS VARCHAR(2300)
+CREATE OR REPLACE FUNCTION dbo.fn_gen_name_path(
+    parent_class_id VARCHAR(21),
+    chinese_name VARCHAR(255)
+)
+    RETURNS TEXT
 AS
 $$
 DECLARE
-    hierarchy_level INT;
-    name_path       VARCHAR(2300);
+    result TEXT;
 BEGIN
-    -- Check if _chinese_name is NULL
-    IF _chinese_name IS NULL THEN
-        -- Return the name_path of the parent class directly
-        SELECT c.name_path
-        INTO name_path
-        FROM dbo.classes c
-        WHERE c.id = _parent_class_id;
-        RETURN name_path;
+    IF parent_class_id IS NULL THEN
+        RETURN chinese_name;
     END IF;
-    -- Retrieve the hierarchy level of the parent class
-    SELECT c.hierarchy_level
-    INTO hierarchy_level
+
+    SELECT CASE
+               WHEN c.name_path = '/' THEN '/' || fn_gen_name_path.chinese_name
+               ELSE c.name_path || '/' || fn_gen_name_path.chinese_name
+               END
+    INTO result
     FROM dbo.classes c
-    WHERE c.id = _parent_class_id;
-    -- Determine name_path based on the hierarchy_level
-    IF hierarchy_level = 0 THEN
-        -- Root level uses the chinese_name directly
-        name_path := '/' || _chinese_name;
-    ELSE
-        -- Concatenate the parent's name_path and current node's chinese_name
-        SELECT FORMAT('%s/%s', c.name_path, _chinese_name)
-        INTO name_path
-        FROM dbo.classes c
-        WHERE c.id = _parent_class_id;
-    END IF;
-    -- Return the computed name_path
-    RETURN name_path;
+    WHERE c.id = parent_class_id;
+
+    RETURN result;
 END;
 $$
     LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION dbo.fn_get_id_path(_parent_class_id VARCHAR(21), _class_id VARCHAR(21) DEFAULT NULL)
-    RETURNS VARCHAR(2300)
+CREATE OR REPLACE FUNCTION dbo.fn_gen_id_path(_parent_class_id VARCHAR(21), _class_id VARCHAR(21) DEFAULT NULL)
+    RETURNS TEXT
 AS
 $$
 DECLARE
-    hierarchy_level INT;
-    id_path         VARCHAR(900);
+    result TEXT;
 BEGIN
-    -- Check if _class_id is NULL
-    IF _class_id IS NULL THEN
-        -- Return the id_path of the parent class directly
-        SELECT c.id_path
-        INTO id_path
-        FROM dbo.classes c
-        WHERE c.id = _parent_class_id;
-        RETURN id_path;
+    IF _parent_class_id IS NULL THEN
+        RETURN _class_id;
     END IF;
 
-    -- Retrieve the hierarchy level of the parent class
-    SELECT c.hierarchy_level
-    INTO hierarchy_level
+    SELECT c.id_path || '/' || fn_gen_id_path._class_id
+    INTO result
     FROM dbo.classes c
     WHERE c.id = _parent_class_id;
-    -- Check if the hierarchy_level is 0
-    IF hierarchy_level = 0 THEN
-        -- If root level, the id_path is just the current class_id
-        id_path := _class_id;
-    ELSE
-        -- Concatenate the parent's id_path and the current class_id
-        SELECT FORMAT('%s/%s', COALESCE(c.id_path, ''), COALESCE(_class_id, ''))
-        INTO id_path
-        FROM dbo.classes c
-        WHERE c.id = _parent_class_id;
-    END IF;
-    -- Return the constructed id_path
-    RETURN id_path;
+
+    RETURN result;
 END;
 $$
     LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION dbo.fn_insert_class(
-    _parent_class_id VARCHAR(21),
-    _entity_id VARCHAR(21),
-    _chinese_name VARCHAR(256),
-    _chinese_description VARCHAR(4000),
-    _owner_id VARCHAR(21) DEFAULT NULL)
-    RETURNS VARCHAR(2300)
+    parent_class_id VARCHAR(21),
+    entity_id VARCHAR(21),
+    chinese_name VARCHAR(256),
+    chinese_description VARCHAR(4000),
+    english_name VARCHAR(256),
+    english_description VARCHAR(4000),
+    owner_id VARCHAR(21) DEFAULT NULL)
+    RETURNS SETOF dbo.classes
 AS
 $$
 DECLARE
-    new_class_id          VARCHAR(21);
-    parent_class_id_local VARCHAR(21);
-    parent_name_path      TEXT;
-    new_name_path         TEXT;
-    new_level             SMALLINT;
-    new_id_path           TEXT;
-    error_message         TEXT;
-    error_context         TEXT;
+    new_class_id        VARCHAR(21) := nanoid();
+    new_name_path       TEXT        := dbo.fn_gen_name_path(parent_class_id, fn_insert_class.chinese_name);
+    new_id_path         TEXT        := dbo.fn_gen_id_path(parent_class_id, new_class_id);
+    new_hierarchy_level INT;
 BEGIN
-    -- Initialize the output value
-    new_class_id := NULL;
-    -- Fetch parent class details
-    SELECT id,
-           name_path
-    INTO parent_class_id_local,
-        parent_name_path
-    FROM dbo.classes
-    WHERE id = _parent_class_id;
-    IF parent_class_id_local IS NOT NULL THEN
-        -- Generate new name path
-        new_name_path := dbo.fn_get_name_path(_parent_class_id, _chinese_name);
-        -- Check if the class already exists
-        IF (SELECT COUNT(*)
-            FROM dbo.classes
-            WHERE name_path = new_name_path) = 0 THEN
-            -- Insert into dbo.class and get the new class_id
-            INSERT INTO dbo.classes(entity_id,
-                                    chinese_name,
-                                    chinese_description,
-                                    owner_id)
-            VALUES (_entity_id,
-                    _chinese_name,
-                    _chinese_description,
-                    _owner_id)
-            RETURNING
-                id INTO new_class_id;
-            -- Insert into inheritance or relevant hierarchy table
-            INSERT INTO dbo.inheritances(pcid, ccid)
-            VALUES (parent_class_id_local,
-                    new_class_id);
-            -- Calculate new level and update the dbo.class record
-            new_level := (SELECT hierarchy_level + 1
-                          FROM dbo.classes
-                          WHERE id = _parent_class_id);
-            new_id_path := dbo.fn_get_id_path(_parent_class_id, new_class_id);
-            INSERT INTO dbo.permissions(class_id,
-                                        role_type,
-                                        role_id,
-                                        permission_bits)
-            SELECT new_class_id,
-                   role_type,
-                   role_id,
-                   permission_bits
-            FROM dbo.permissions
-            WHERE class_id = _parent_class_id;
-            UPDATE
-                dbo.classes
-            SET hierarchy_level = new_level,
-                name_path       = new_name_path,
-                id_path         = new_id_path
-            WHERE id = new_class_id;
-        ELSE
-            -- Raise an error if the class already exists
-            RAISE EXCEPTION 'Error: Class already exists, cannot insert.';
-        END IF;
-    ELSE
-        -- Raise an error if no parent class ID is provided
-        RAISE EXCEPTION 'Error: Parent class ID not found.';
+    -- 檢查NamePath是否重複
+    IF EXISTS(SELECT 1
+              FROM dbo.classes
+              WHERE name_path = new_name_path) THEN
+        RAISE EXCEPTION 'Error: name_path 已經存在，無法建立 class。NamePath: %', new_name_path USING ERRCODE = 'P0001';
     END IF;
-    -- Return the newly created class ID
-    RETURN new_class_id;
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Capture error details and raise the error with additional context
-        GET STACKED DIAGNOSTICS error_message = MESSAGE_TEXT,
-            error_context = PG_EXCEPTION_CONTEXT;
-        RAISE EXCEPTION 'Error code: %, Error message: %, Context: %', sqlstate, error_message, error_context;
-END;
 
+    IF parent_class_id IS NULL THEN
+        new_hierarchy_level := 0;
+    ELSE
+        SELECT hierarchy_level + 1
+        INTO new_hierarchy_level
+        FROM dbo.classes
+        WHERE id = parent_class_id;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Error: parent_class_id % 不存在，無法建立 class。', parent_class_id USING ERRCODE = 'P0001';
+        END IF;
+    END IF;
+
+    RETURN QUERY INSERT INTO dbo.classes (id, entity_id, chinese_name, chinese_description, english_name,
+                                          english_description,
+                                          owner_id,
+                                          id_path,
+                                          name_path,
+                                          hierarchy_level)
+        VALUES (new_class_id,
+                fn_insert_class.entity_id,
+                fn_insert_class.chinese_name,
+                fn_insert_class.chinese_description,
+                fn_insert_class.english_name,
+                fn_insert_class.english_description,
+                fn_insert_class.owner_id,
+                new_id_path,
+                new_name_path,
+                new_hierarchy_level)
+        RETURNING *;
+
+    -- Inherit permissions from parent class
+    INSERT INTO dbo.permissions
+    SELECT new_class_id, role_type, role_id, permission_bits
+    FROM dbo.permissions
+    WHERE class_id = parent_class_id;
+
+    RETURN;
+END;
 $$
     LANGUAGE plpgsql;
 

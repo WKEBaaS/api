@@ -32,10 +32,11 @@ func (i3s *I3S) PostMetadata() error {
 		{"auth", "roles", lo.ToPtr("role")},
 		{"auth", "user_roles", lo.ToPtr("user_role")},
 		{"dbo", "classes", lo.ToPtr("class")},
+		{"dbo", "permissions", lo.ToPtr("permission")},
+		{"dbo", "permission_enum", nil},
 		{"dbo", "objects", lo.ToPtr("object")},
 		{"dbo", "inheritances", lo.ToPtr("inheritance")},
 		{"dbo", "co", nil},
-		{"api", "class_permission_enum", nil},
 		{"api", "check_class_permission_result", nil},
 		// {"dbo", "text_result", nil},
 	}
@@ -96,6 +97,7 @@ func (i3s *I3S) PostMetadata() error {
 		// {"dbo", "fn_insert_class", "hasura_session", lo.ToPtr("mutation"), lo.ToPtr("Insert a new class")},
 		// {"dbo", "get_session_role", "hasura_session", nil, lo.ToPtr("Get session role")},
 		{"api", "check_class_permission", lo.ToPtr("hasura_session"), nil, lo.ToPtr("Check user's class permission")},
+		{"api", "insert_class", lo.ToPtr("hasura_session"), nil, lo.ToPtr("Insert a new class")},
 	}
 
 	for _, f := range functions {

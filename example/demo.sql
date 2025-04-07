@@ -16,7 +16,16 @@ $$
         INSERT INTO dbo.objects(chinese_name) VALUES ('一般使用者') RETURNING id INTO normal_user_id;
         INSERT INTO auth.users(id, role, email) VALUES (normal_user_id, 'user', 'wke_normal@wke.csie.ncnu.edu.tw');
 
-        SELECT dbo.fn_insert_class(root_class_id, q_entity_id, '題目', '題目描述', normal_user_id)
+        SELECT id
+        FROM dbo.fn_insert_class(
+                parent_class_id := root_class_id,
+                entity_id := q_entity_id,
+                chinese_name := '題目',
+                chinese_description := '題目描述',
+                english_name := 'Question',
+                english_description := 'Question description',
+                owner_id := NULL
+             )
         INTO problem_class_id;
 
         INSERT INTO postgres.dbo.objects(entity_id, chinese_name, chinese_description, english_name,
