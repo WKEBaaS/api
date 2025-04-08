@@ -1,30 +1,16 @@
-CREATE TABLE IF NOT EXISTS api.has_role_result
+CREATE TABLE IF NOT EXISTS api.permission_enum_result
 (
-    has_role BOOLEAN
+    LIKE dbo.permission_enum
 );
 
-CREATE OR REPLACE FUNCTION api.has_role(
-    hasura_session json,
-    role TEXT
-) RETURNS SETOF api.has_role_result AS
+CREATE OR REPLACE FUNCTION api.get_permission_enum(
+) RETURNS SETOF api.permission_enum_result AS
 $$
-DECLARE
-    v_user_id VARCHAR(21) := hasura_session ->> 'x-hasura-user-id';
 BEGIN
-    IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'x-hasura-user-id is null' USING ERRCODE = '22000';
-    END IF;
-
-    RETURN QUERY SELECT TRUE
-                 FROM auth.user_roles ur
-                          JOIN auth.roles r ON r.id = ur.role_id
-                 WHERE ur.user_id = v_user_id
-                   AND r.name = role
-                 LIMIT 1;
+    RETURN QUERY SELECT *
+                 FROM dbo.permission_enum;
 END;
 $$ LANGUAGE plpgsql STABLE;
-
-COMMENT ON FUNCTION api.has_role IS 'Returns true if the user has role. Otherwise, returns null.';
 
 CREATE TABLE IF NOT EXISTS api.check_class_permission_result
 (
@@ -45,25 +31,24 @@ BEGIN
         RAISE EXCEPTION 'x-hasura-user-id is null' USING ERRCODE = '22000';
     END IF;
 
+    SELECT bit
+    INTO v_permission_bit
+    FROM dbo.permission_enum
+    WHERE id = permission;
+    IF NOT found THEN
+        RAISE EXCEPTION 'Permission % not found', permission
+            USING ERRCODE = '22000';
+    END IF;
+
     IF hasura_session ->> 'x-hasura-role' = 'admin' THEN
         RETURN QUERY SELECT TRUE;
         RETURN;
     END IF;
 
     -- Check if the user is an admin
-    RETURN QUERY SELECT TRUE FROM api.has_role(hasura_session, 'admin');
-    IF found THEN
+    IF auth.fn_user_has_role(v_user_id, 'admin') THEN
+        RETURN QUERY SELECT TRUE;
         RETURN;
-    END IF;
-
-    SELECT bit
-    INTO v_permission_bit
-    FROM dbo.permission_enum
-    WHERE id = permission;
-
-    IF NOT found THEN
-        RAISE EXCEPTION 'Permission % not found', permission
-            USING ERRCODE = '22000';
     END IF;
 
     RETURN QUERY SELECT TRUE
@@ -136,6 +121,8 @@ END;
 $$
     LANGUAGE plpgsql VOLATILE;
 
+COMMENT ON FUNCTION api.insert_class IS 'Insert a new class. This API will check if the user has permission to insert a class.';
+
 CREATE OR REPLACE FUNCTION api.delete_class(
     hasura_session json,
     class_id VARCHAR(21)
@@ -153,3 +140,5 @@ BEGIN
     RETURN QUERY SELECT * FROM dbo.fn_delete_class(class_id);
 END;
 $$ LANGUAGE plpgsql VOLATILE;
+
+COMMENT ON FUNCTION api.delete_class IS 'Delete a class. This API will check if the user has permission to delete a class.';

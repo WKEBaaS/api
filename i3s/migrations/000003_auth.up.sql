@@ -167,3 +167,36 @@ BEGIN
                     AND r.is_enabled);
 END;
 $$ LANGUAGE plpgsql STABLE;
+
+CREATE OR REPLACE FUNCTION auth.fn_user_has_role(
+    user_id TEXT,
+    role_name TEXT
+) RETURNS BOOLEAN AS
+$$
+DECLARE
+    result    BOOLEAN;
+    v_role_id TEXT;
+BEGIN
+    IF user_id IS NULL THEN
+        RAISE EXCEPTION 'user_id cannot be null'
+            USING ERRCODE = '22000';
+    END IF;
+
+    SELECT id
+    FROM auth.roles
+    WHERE name = role_name
+    INTO v_role_id;
+    IF NOT found THEN
+        RAISE EXCEPTION 'Role % not found', role_name
+            USING ERRCODE = '22000';
+    END IF;
+
+    SELECT EXISTS(SELECT 1
+                  FROM auth.user_roles ur
+                  WHERE ur.user_id = fn_user_has_role.user_id
+                    AND ur.role_id = v_role_id)
+    INTO result;
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
