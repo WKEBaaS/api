@@ -45,11 +45,6 @@ func InitAPI(appConfig *configs.Config, service *services.Service) humacli.CLI {
 			log.Fatalf("failed to post metadata: %v\n", err)
 		}
 
-		// api := humafiber.New(app, humaConfig)
-		// v1Api := huma.NewGroup(api, "/api/v1")
-
-		// huma.AutoRegister(v1Api, userController)
-
 		hooks.OnStart(func() {
 			app.Listen(fmt.Sprintf(":%d", options.Port))
 		})
