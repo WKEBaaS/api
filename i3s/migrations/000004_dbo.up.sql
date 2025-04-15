@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS dbo.object_relations
 CREATE TABLE IF NOT EXISTS dbo.entities
 (
     id            VARCHAR(21)                           NOT NULL DEFAULT nanoid() UNIQUE,
-    rank          INT,
+    rank          INT GENERATED ALWAYS AS IDENTITY (START WITH 100),
     chinese_name  VARCHAR(50),
     english_name  VARCHAR(50),
     is_relational BOOLEAN     DEFAULT FALSE             NOT NULL,

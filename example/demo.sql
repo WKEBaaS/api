@@ -11,10 +11,10 @@ $$
         SELECT id FROM postgres.dbo.classes WHERE name_path = '/' INTO root_class_id;
 
         INSERT INTO dbo.objects(chinese_name) VALUES ('超級使用者') RETURNING id INTO admin_user_id;
-        INSERT INTO auth.users(id, role, email) VALUES (admin_user_id, 'admin', 'wke_admin@wke.csie.ncnu.edu.tw');
+        INSERT INTO auth.users(id, email) VALUES (admin_user_id,  'wke_admin@wke.csie.ncnu.edu.tw');
 
         INSERT INTO dbo.objects(chinese_name) VALUES ('一般使用者') RETURNING id INTO normal_user_id;
-        INSERT INTO auth.users(id, role, email) VALUES (normal_user_id, 'user', 'wke_normal@wke.csie.ncnu.edu.tw');
+        INSERT INTO auth.users(id, email) VALUES (normal_user_id, 'wke_normal@wke.csie.ncnu.edu.tw');
 
         SELECT id
         FROM dbo.fn_insert_class(

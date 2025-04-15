@@ -1,7 +1,6 @@
 CREATE TABLE auth.users
 (
     id                   VARCHAR(21)  NOT NULL UNIQUE,
-    "role"               VARCHAR(255) NULL,
     email                VARCHAR(255) NULL UNIQUE,
     encrypted_password   VARCHAR(255) NULL,
     confirmed_at         timestamptz  NULL,
@@ -22,7 +21,6 @@ CREATE TABLE auth.users
 -- CREATE INDEX users_instance_id_email_idx ON auth.user USING btree (instance_id, email);
 -- CREATE INDEX users_instance_id_idx ON auth.user USING btree (instance_id);
 COMMENT ON TABLE auth.users IS 'Auth: Stores user login data within a secure schema.';
-COMMENT ON COLUMN auth.users.role IS 'Auth: will be used for hasura request header x-hasura-default-role';
 
 CREATE TABLE auth.identities
 (

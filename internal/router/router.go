@@ -19,7 +19,7 @@ type Options struct {
 
 func InitAPI(appConfig *configs.Config, service *services.Service) humacli.CLI {
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		humaConfig := huma.DefaultConfig("Auth API", "0.2.0")
+		humaConfig := huma.DefaultConfig("WKE BaaS API", "0.1.0")
 		humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 			"bearer": {
 				Type:         "http",
