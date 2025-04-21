@@ -1,0 +1,38 @@
+# WKE BaaS Deployment
+services:
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "baas-traefik"
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.postgres.address=:5432"
+      - "--entrypoints.postgres.transport.tls=true"
+      - "--entrypoints.postgres.transport.tls.passthrough=true"
+    ports:
+      - "80:80"
+      - "5432:5432"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - baas-net
+  db:
+    image: postgres:17
+    ports:
+      - "5434:5432"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secretpgpassword}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - baas-net
+volumes:
+  db-data:
+networks:
+  baas-net:
+    external: true
