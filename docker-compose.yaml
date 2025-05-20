@@ -1,25 +1,5 @@
 # WKE BaaS Deployment
 services:
-  traefik:
-    image: "traefik:v2.5"
-    container_name: "baas-traefik"
-    command:
-      - "--api.dashboard=true"
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.postgres.address=:5432"
-      - "--entrypoints.postgres.transport.tls=true"
-      - "--entrypoints.postgres.transport.tls.passthrough=true"
-    ports:
-      - "80:80"
-      - "5432:5432"
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    networks:
-      - baas-net
   db:
     image: postgres:17
     ports:
@@ -30,9 +10,30 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     networks:
-      - baas-net
+      - traefik
+  postgrest:
+    image: postgrest/postgrest:v12.2.8
+    depends_on:
+      - db
+    restart: always
+    expose:
+      - 3000
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD:-secretpgpassword}@db:5432/postgres
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://${BAAS_HOST}/pgrst
+      PGRST_DB_SCHEMAS: api
+      PGRST_DB_ANON_ROLE: guest
+      PGRST_OPENAPI_MODE: ignore-privileges
+      PGRST_JWT_SECRET: ${JWK_PUBLIC_KEY}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.postgrest.rule=Host(`${BAAS_HOST}`) && PathPrefix(`/pgrst`)"
+      - "traefik.http.routers.postgrest.entrypoints=web"
+      - "traefik.http.middlewares.postgrest-stripprefix.stripPrefix.prefixes=/pgrst"
+      - "traefik.http.routers.postgrest.middlewares=postgrest-stripprefix@docker"
 volumes:
   db-data:
 networks:
-  baas-net:
+  default:
+  traefik:
     external: true

@@ -1,13 +1,12 @@
 package configs
 
 import (
-	"crypto/rsa"
 	"fmt"
 	"os"
 	"strconv"
 
-	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
 type Config struct {
@@ -23,9 +22,9 @@ type Config struct {
 		Issuer       string
 		RedirectURL  string
 	}
-	Jwt struct {
-		PrivateKey *rsa.PrivateKey
-		PublicKey  *rsa.PublicKey
+	JWK struct {
+		PrivateKey jwk.Key
+		PublicKey  jwk.Key
 		Issuer     string
 		ExpireIn   int
 	}
@@ -46,21 +45,24 @@ func LoadConfig() *Config {
 	c.Keycloak.RedirectURL = os.Getenv("KEYCLOAK_REDIRECT_URL")
 
 	var err error
-	c.Jwt.PrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(os.Getenv("JWT_PRIVATE_KEY")))
+	c.JWK.PrivateKey, err = jwk.ParseKey([]byte(os.Getenv("JWT_PRIVATE_KEY")))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to parse private key %s", err))
 	}
-	c.Jwt.PublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(os.Getenv("JWT_PUBLIC_KEY")))
+
+	c.JWK.PublicKey, err = jwk.PublicKeyOf(c.JWK.PrivateKey)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to parse public key %s", err))
+		panic(fmt.Sprintf("Failed to get public key %s", err))
 	}
-	c.Jwt.ExpireIn = func() int {
+
+	c.JWK.ExpireIn = func() int {
 		valueStr := os.Getenv("JWT_EXPIRE_IN")
 		if value, err := strconv.Atoi(valueStr); err == nil {
 			return value
 		}
-		return 3600
+		// Default to 7 days
+		return 604800
 	}()
-	c.Jwt.Issuer = os.Getenv("JWT_ISSUER")
+	c.JWK.Issuer = os.Getenv("JWT_ISSUER")
 	return c
 }

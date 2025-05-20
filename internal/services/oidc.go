@@ -47,9 +47,9 @@ func (s *Service) AuthCallback(ctx context.Context, code string, nonce string, c
 		"email":  idTokenClaims.Email,
 		"name":   idTokenClaims.Name,
 		"client": config.ClientID,
-		"iss":    s.config.Jwt.Issuer,
+		"iss":    s.config.JWK.Issuer,
 		"iat":    time.Now().Unix(),
-		"exp":    time.Now().Add(time.Duration(s.config.Jwt.ExpireIn) * time.Second).Unix(),
+		"exp":    time.Now().Add(time.Duration(s.config.JWK.ExpireIn) * time.Second).Unix(),
 		"sub":    idToken.Subject,
 		"https://hasura.io/jwt/claims": map[string]any{
 			"x-hasura-default-role":  idTokenClaims.Hasura.XHasuraDefaultRole,

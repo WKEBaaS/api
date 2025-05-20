@@ -1,3 +1,7 @@
+CREATE ROLE authenticator LOGIN NOINHERIT NOCREATEDB NOCREATEROLE NOSUPERUSER;
+CREATE ROLE guest NOLOGIN;
+CREATE ROLE authed NOLOGIN;
+
 CREATE TABLE auth.users
 (
     id                   VARCHAR(21)  NOT NULL UNIQUE,
@@ -109,30 +113,6 @@ CREATE TABLE auth.user_roles
     CONSTRAINT fk_auth_user_role_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
     CONSTRAINT fk_auth_user_role_role_id FOREIGN KEY (role_id) REFERENCES auth.roles ON DELETE CASCADE
 );
-
--- CREATE TABLE auth.groups
--- (
---     id          VARCHAR(21)  NOT NULL DEFAULT nanoid() UNIQUE,
---     name        VARCHAR(255) NOT NULL,
---     description TEXT,
---     created_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
---     updated_at  timestamptz           DEFAULT CURRENT_TIMESTAMP,
---     is_enabled  BOOLEAN               DEFAULT TRUE,
---     CONSTRAINT pk_auth_group PRIMARY KEY (id),
---     CONSTRAINT uq_auth_group_name UNIQUE (name)
--- );
---
--- CREATE TABLE auth.user_groups
--- (
---     user_id    VARCHAR(21) NOT NULL,
---     group_id   VARCHAR(21) NOT NULL,
---     created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
---     updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
---     CONSTRAINT pk_auth_user_group PRIMARY KEY (user_id, group_id),
---     CONSTRAINT fk_auth_user_group_user_id FOREIGN KEY (user_id) REFERENCES auth.users ON DELETE CASCADE,
---     CONSTRAINT fk_auth_user_group_group_id FOREIGN KEY (group_id) REFERENCES auth.groups ON DELETE CASCADE
--- );
---
 
 -- Auth tuples
 INSERT INTO auth.roles (name, description)
