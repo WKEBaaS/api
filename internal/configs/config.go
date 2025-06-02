@@ -45,7 +45,7 @@ func LoadConfig() *Config {
 	c.Keycloak.RedirectURL = os.Getenv("KEYCLOAK_REDIRECT_URL")
 
 	var err error
-	c.JWK.PrivateKey, err = jwk.ParseKey([]byte(os.Getenv("JWT_PRIVATE_KEY")))
+	c.JWK.PrivateKey, err = jwk.ParseKey([]byte(os.Getenv("JWK_PRIVATE_KEY")))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to parse private key %s", err))
 	}

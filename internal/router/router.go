@@ -44,9 +44,9 @@ func InitAPI(appConfig *configs.Config, repo *repo.Repository, service *services
 			log.Fatalf("failed to migrate database: %v\n", err)
 		}
 
-		if err := i3s.PostMetadata(); err != nil {
-			log.Fatalf("failed to post metadata: %v\n", err)
-		}
+		// if err := i3s.PostMetadata(); err != nil {
+		// 	log.Fatalf("failed to post metadata: %v\n", err)
+		// }
 
 		////////// Register APIs //////////
 		api := humafiber.New(app, humaConfig)
