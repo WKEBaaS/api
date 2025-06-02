@@ -1,23 +1,21 @@
 package controllers
 
 import (
+	"baas-api/internal/controllers/inputs"
+	"baas-api/internal/controllers/outputs"
 	"context"
-	"i3s-service/internal/controllers/inputs"
-	"i3s-service/internal/controllers/outputs"
-	"i3s-service/internal/repo"
-	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 )
 
 type AuthController struct {
-	repo *repo.Repository
+	// repo *repo.Repository
 }
 
-func InitAuthController(repo *repo.Repository) *AuthController {
+func InitAuthController() *AuthController {
 	controller := &AuthController{}
-	controller.repo = repo
+	// controller.repo = repo
 
 	return controller
 }
@@ -33,16 +31,16 @@ func (c *AuthController) RegisterAuthAPIs(api huma.API) {
 	}, func(ctx context.Context, input *inputs.AuthCallbackInput) (*outputs.AuthCallbackOutput, error) {
 		resp := &outputs.AuthCallbackOutput{}
 
-		userID, err := c.repo.GetUserIDByIdentity(ctx, "keycloak", "3bb24321-baa4-41f8-9bf5-c1eb16a3f336")
-		if err != nil {
-			slog.Error(err.Error())
-			resp.Status = http.StatusNotFound
-			resp.Body.Message = "user not found"
-			return resp, nil
-		}
+		// userID, err := c.repo.GetUserIDByIdentity(ctx, "keycloak", "3bb24321-baa4-41f8-9bf5-c1eb16a3f336")
+		// if err != nil {
+		// 	slog.Error(err.Error())
+		// 	resp.Status = http.StatusNotFound
+		// 	resp.Body.Message = "user not found"
+		// 	return resp, nil
+		// }
 
 		resp.Status = http.StatusOK
-		resp.Body.Message = *userID
+		resp.Body.Message = ""
 		return resp, nil
 	})
 }

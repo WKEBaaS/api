@@ -1,11 +1,11 @@
 package hasura
 
 import (
+	"baas-api/internal/configs"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"i3s-service/internal/configs"
 	"io"
 	"net/http"
 	"time"

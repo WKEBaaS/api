@@ -1,12 +1,12 @@
 package router
 
 import (
+	"baas-api/i3s"
+	"baas-api/internal/configs"
+	"baas-api/internal/controllers"
+	"baas-api/internal/repo"
+	"baas-api/internal/services"
 	"fmt"
-	"i3s-service/i3s"
-	"i3s-service/internal/configs"
-	"i3s-service/internal/controllers"
-	"i3s-service/internal/repo"
-	"i3s-service/internal/services"
 	"log"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -20,7 +20,7 @@ type Options struct {
 	Port int `help:"Port to listen on" short:"p" default:"8888"`
 }
 
-func InitAPI(appConfig *configs.Config, repo *repo.Repository, service *services.Service) humacli.CLI {
+func InitAPI(appConfig *configs.Config, service *services.Service, repo *repo.Repository) humacli.CLI {
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
 		humaConfig := huma.DefaultConfig("WKE BaaS API", "0.1.0")
 		humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
@@ -53,7 +53,7 @@ func InitAPI(appConfig *configs.Config, repo *repo.Repository, service *services
 		v1Api := huma.NewGroup(api, "/api/v1")
 
 		// Init controllers
-		authController := controllers.InitAuthController(repo)
+		authController := controllers.InitAuthController()
 
 		// Register controllers
 		huma.AutoRegister(v1Api, authController)
@@ -62,7 +62,7 @@ func InitAPI(appConfig *configs.Config, repo *repo.Repository, service *services
 			app.Listen(fmt.Sprintf(":%d", options.Port))
 		})
 		hooks.OnStop(func() {
-			service.DB.Close()
+			// service.DB.Close()
 		})
 	})
 

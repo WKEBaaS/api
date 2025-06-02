@@ -1,8 +1,8 @@
 package i3s
 
 import (
-	"i3s-service/internal/configs"
-	"i3s-service/internal/services"
+	"baas-api/internal/configs"
+	"baas-api/internal/services"
 	"log/slog"
 
 	"github.com/samber/lo"

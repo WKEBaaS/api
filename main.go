@@ -1,10 +1,10 @@
 package main
 
 import (
-	"i3s-service/internal/configs"
-	"i3s-service/internal/repo"
-	"i3s-service/internal/router"
-	"i3s-service/internal/services"
+	"baas-api/internal/configs"
+	"baas-api/internal/repo"
+	"baas-api/internal/router"
+	"baas-api/internal/services"
 )
 
 func main() {
@@ -12,9 +12,9 @@ func main() {
 
 	//////////// Init Repo, Service //////////
 	repo := repo.InitRepository(config)
-	service := services.InitService(config)
+	service := services.InitService(config, repo)
 
-	cli := router.InitAPI(config, repo, service)
+	cli := router.InitAPI(config, service, repo)
 
 	cli.Run()
 }
