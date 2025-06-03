@@ -13,7 +13,7 @@ type AuthController struct {
 	// repo *repo.Repository
 }
 
-func InitAuthController() *AuthController {
+func NewAuthController() *AuthController {
 	controller := &AuthController{}
 	// controller.repo = repo
 

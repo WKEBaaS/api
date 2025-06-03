@@ -1,5 +1,14 @@
 package models
 
+import (
+	"errors"
+	"regexp"
+)
+
+var ErrInvalidReference = errors.New("invalid reference format, must be exactly 20 alphabetic characters [a-zA-Z]")
+
+var refRegex = regexp.MustCompile(`^[a-zA-Z]{20}$`)
+
 // Project 對應 dbo.projects 資料表
 type Project struct {
 	ID        string `gorm:"type:varchar(21);primaryKey;unique"` // VARCHAR(21) NOT NULL UNIQUE, 同時是主鍵
@@ -11,4 +20,8 @@ type Project struct {
 
 func (Project) TableName() string {
 	return "dbo.projects"
+}
+
+func IsValidReference(ref string) bool {
+	return refRegex.MatchString(ref)
 }

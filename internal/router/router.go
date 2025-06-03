@@ -1,11 +1,10 @@
 package router
 
 import (
-	"baas-api/i3s"
 	"baas-api/internal/configs"
 	"baas-api/internal/controllers"
+	"baas-api/internal/i3s"
 	"baas-api/internal/repo"
-	"baas-api/internal/services"
 	"fmt"
 	"log"
 
@@ -20,7 +19,7 @@ type Options struct {
 	Port int `help:"Port to listen on" short:"p" default:"8888"`
 }
 
-func InitAPI(appConfig *configs.Config, service *services.Service, repo *repo.Repository) humacli.CLI {
+func NewAPI(appConfig *configs.Config, repo repo.ProjectRepository) humacli.CLI {
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
 		humaConfig := huma.DefaultConfig("WKE BaaS API", "0.1.0")
 		humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
@@ -39,7 +38,7 @@ func InitAPI(appConfig *configs.Config, service *services.Service, repo *repo.Re
 			Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
 		}))
 
-		i3s := i3s.InitI3S(appConfig, service)
+		i3s := i3s.NewI3S(appConfig)
 		if err := i3s.Migrate(); err != nil {
 			log.Fatalf("failed to migrate database: %v\n", err)
 		}
@@ -53,7 +52,7 @@ func InitAPI(appConfig *configs.Config, service *services.Service, repo *repo.Re
 		v1Api := huma.NewGroup(api, "/api/v1")
 
 		// Init controllers
-		authController := controllers.InitAuthController()
+		authController := controllers.NewAuthController()
 
 		// Register controllers
 		huma.AutoRegister(v1Api, authController)
