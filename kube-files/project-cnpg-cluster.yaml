@@ -1,0 +1,12 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: <project_name>
+  namespace: <project_namespace>
+spec:
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+  instances: 1
+  storage:
+    size: 1Gi

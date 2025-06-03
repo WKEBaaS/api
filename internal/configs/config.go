@@ -24,7 +24,8 @@ type Config struct {
 		ExpireIn   int
 	}
 	Kube struct {
-		ConfigPath string
+		ConfigPath        string
+		ProjectsNamespace string
 	}
 }
 
@@ -60,6 +61,7 @@ func LoadConfig() *Config {
 	c.JWK.Issuer = os.Getenv("JWT_ISSUER")
 
 	c.Kube.ConfigPath = os.Getenv("KUBE_CONFIG_PATH")
+	c.Kube.ProjectsNamespace = os.Getenv("KUBE_PROJECTS_NAMESPACE")
 
 	return c
 }

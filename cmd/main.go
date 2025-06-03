@@ -34,7 +34,7 @@ func main() {
 
 	//////////// Init Repo, Service //////////
 	projectRepo := repo.NewProjectRepository(db)
-	// service := services.NewService(config, projectRepo)
+	kubeProjectRepo := repo.NewKubeProjectRepository(config)
 
 	cli := router.NewAPI(config, projectRepo)
 
