@@ -11,12 +11,7 @@ import (
 
 type Config struct {
 	DatabaseURL string
-	Hasura      struct {
-		URL    string
-		Secret string
-		Source string // default: "postgres"
-	}
-	Keycloak struct {
+	Keycloak    struct {
 		ClientId     string
 		ClientSecret string
 		Issuer       string
@@ -28,16 +23,15 @@ type Config struct {
 		Issuer     string
 		ExpireIn   int
 	}
+	Kube struct {
+		ConfigPath string
+	}
 }
 
 func LoadConfig() *Config {
 	c := &Config{}
 
 	c.DatabaseURL = os.Getenv("DATABASE_URL")
-
-	c.Hasura.URL = os.Getenv("HASURA_URL")
-	c.Hasura.Secret = os.Getenv("HASURA_SECRET")
-	c.Hasura.Source = os.Getenv("HASURA_SOURCE")
 
 	c.Keycloak.ClientId = os.Getenv("KEYCLOAK_CLIENT_ID")
 	c.Keycloak.ClientSecret = os.Getenv("KEYCLOAK_CLIENT_SECRET")
@@ -64,5 +58,8 @@ func LoadConfig() *Config {
 		return 604800
 	}()
 	c.JWK.Issuer = os.Getenv("JWT_ISSUER")
+
+	c.Kube.ConfigPath = os.Getenv("KUBE_CONFIG_PATH")
+
 	return c
 }
