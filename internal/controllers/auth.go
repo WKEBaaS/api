@@ -10,7 +10,7 @@ import (
 
 	"github.com/coreos/go-oidc"
 	"github.com/danielgtaylor/huma/v2"
-	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
 
@@ -82,8 +82,8 @@ func (c *authController) authMiddleware(ctx huma.Context, next func(huma.Context
 
 func (c *authController) authLogin(ctx context.Context, input *dto.AuthLoginInput) (*dto.AuthLoginOutput, error) {
 	resp := &dto.AuthLoginOutput{}
-	state, _ := gonanoid.New()
-	nonce, _ := gonanoid.New()
+	state := uuid.New().String()
+	nonce := uuid.New().String()
 	tls, ok := ctx.Value("TLS").(bool)
 	if !ok {
 		return nil, huma.Error500InternalServerError("context value TLS not found ")

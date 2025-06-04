@@ -7,7 +7,7 @@ import (
 )
 
 type Entity struct {
-	ID           string    `gorm:"type:varchar(21);primaryKey;unique;not null"`
+	ID           string    `gorm:"type:varchar(21);primaryKey;default:nanoid();unique;not null"`
 	Rank         int       `gorm:"column:rank;<-:false"` // `<-:false` prevents GORM from writing to this column
 	ChineseName  string    `gorm:"type:varchar(50);column:chinese_name"`
 	EnglishName  string    `gorm:"type:varchar(50);column:english_name"`

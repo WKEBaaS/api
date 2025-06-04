@@ -16,11 +16,24 @@ var (
 	ErrFailedToCheckUserExistsByProvider = errors.New("failed to check if user exists by provider and ID")
 )
 
+type CreateUserFromIdentityInput struct {
+	// Object fields
+	UserEntityID string
+	Name         string
+	// User fields
+	Email    *string
+	Username string
+	// Identity fields
+	Provider     string
+	ProviderID   string
+	IdentityData datatypes.JSON
+}
+
 type UserRepository interface {
 	// CreateUserFromIdentity creates a user from an identity provider.
 	//
 	// Returns the user ID if successful, or an error if the operation fails.
-	CreateUserFromIdentity(ctx context.Context, email *string, userEntityID, username, provider, providerID string, identityData datatypes.JSON) (*string, error)
+	CreateUserFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error)
 	// Check if the user exists by provider and provider ID.
 	CheckUserExistsByProviderAndID(ctx context.Context, provider, providerID string) (bool, error)
 }
@@ -37,19 +50,20 @@ func NewUserRepository(db *gorm.DB, cache *cache.Cache) UserRepository {
 	}
 }
 
-func (r *userRepository) CreateUserFromIdentity(ctx context.Context, email *string, userEntityID, username, provider, providerID string, identityData datatypes.JSON) (*string, error) {
+func (r *userRepository) CreateUserFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error) {
 	object := &models.Object{
-		EntityID: &userEntityID,
+		EntityID:    &in.UserEntityID,
+		ChineseName: &in.Name,
 	}
 	user := &models.User{
-		Username: username,
-		Email:    email,
+		Username: &in.Username,
+		Email:    in.Email,
 	}
 
 	identity := &models.Identity{
-		Provider:     provider,
-		ProviderID:   providerID,
-		IdentityData: identityData,
+		Provider:     in.Provider,
+		ProviderID:   in.ProviderID,
+		IdentityData: in.IdentityData,
 	}
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -72,6 +86,9 @@ func (r *userRepository) CreateUserFromIdentity(ctx context.Context, email *stri
 
 		return nil
 	})
+
+	// update user existing cache
+	r.cache.Set("user"+in.Provider+in.ProviderID, true, cache.DefaultExpiration)
 
 	return &user.ID, err
 }

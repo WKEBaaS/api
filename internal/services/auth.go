@@ -6,12 +6,14 @@ import (
 	"baas-api/internal/repo"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"time"
 
 	"github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
+	"gorm.io/datatypes"
 )
 
 var (
@@ -63,37 +65,46 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 	}
 
 	var idTokenClaims struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Username string `json:"preferred_username"`
 	}
 	if err := idToken.Claims(&idTokenClaims); err != nil {
 		slog.ErrorContext(ctx, "Failed to parse ID token claims", "error", err)
 		return nil, ErrFailedToParseIDTokenClaims
 	}
 
-	log.Printf("ID Token: %+v", idToken)
 	log.Printf("ID Token Claims: %+v", idTokenClaims)
 
-	// exist, err := s.userRepo.CheckUserExistsByProviderAndID(ctx, "keycloak", idToken.Subject)
-	// if err != nil {
-	// 	return err
-	// }
+	exist, err := s.userRepo.CheckUserExistsByProviderAndID(ctx, "keycloak", idToken.Subject)
+	if err != nil {
+		return nil, err
+	}
 
 	// If user does not exist, create a new user
-	// var userID string
-	// if !exist {
-	// 	userEntityID, err := s.entiryRepo.GetEntityByChineseName(ctx, "使用者")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	//
-	// 	// TODO: Handle identity data
-	// 	id, err := s.userRepo.CreateUserFromIdentity(ctx, &idTokenClaims.Email, userEntityID.ID, idTokenClaims.Name, "keycloak", idToken.Subject, nil)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	userID = *id
-	// }
+	var userID string
+	if !exist {
+		userEntityID, err := s.entiryRepo.GetEntityByChineseName(ctx, "使用者")
+		if err != nil {
+			return nil, err
+		}
+
+		id, err := s.userRepo.CreateUserFromIdentity(ctx, &repo.CreateUserFromIdentityInput{
+			UserEntityID: userEntityID.ID,
+			Name:         idTokenClaims.Name,
+			Email:        &idTokenClaims.Email,
+			Username:     idTokenClaims.Username,
+			Provider:     "keycloak",
+			ProviderID:   idToken.Subject,
+			IdentityData: datatypes.JSON([]byte(fmt.Sprintf(`{"email":"%s"}`, idTokenClaims.Email))),
+		})
+		if err != nil {
+			return nil, err
+		}
+		userID = *id
+	}
+
+	log.Printf("User ID: %s", userID)
 
 	// tok, err := jwt.NewBuilder().
 	// 	Issuer(s.jwtIssuer).

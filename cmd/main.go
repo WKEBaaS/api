@@ -6,7 +6,9 @@ import (
 	"baas-api/internal/repo"
 	"baas-api/internal/router"
 	"baas-api/internal/services"
+	"time"
 
+	"github.com/patrickmn/go-cache"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -26,23 +28,23 @@ func main() {
 		panic(err)
 	}
 	//////////// Init Cache //////////
-	// cache := cache.New(15*time.Minute, 20*time.Minute)
+	cache := cache.New(15*time.Minute, 20*time.Minute)
 
 	//////////// Init Repo, Service //////////
 	// Repositories
 	projectRepo := repo.NewProjectRepository(db)
 	kubeProjectRepo := repo.NewKubeProjectRepository(config)
-	// entityRepo := repo.NewEntityRepository(db, cache)
-	// userRepo := repo.NewUserRepository(db, cache)
+	entityRepo := repo.NewEntityRepository(db, cache)
+	userRepo := repo.NewUserRepository(db, cache)
 	// Services
 	projectService := services.NewProjectService(config, projectRepo, kubeProjectRepo)
-	// authService := services.NewAuthService(config, entityRepo, userRepo)
+	authService := services.NewAuthService(config, entityRepo, userRepo)
 
 	//////////// Init Controllers //////////
-	// authController := controllers.NewAuthController(config, authService)
+	authController := controllers.NewAuthController(config, authService)
 	projectController := controllers.NewProjectController(projectService)
 
-	cli := router.NewAPI(config, projectController)
+	cli := router.NewAPI(config, authController, projectController)
 
 	cli.Run()
 }

@@ -8,7 +8,7 @@ import (
 
 type User struct {
 	ID                 string         `gorm:"type:varchar(21);primaryKey;not null"` // UNIQUE 已由 primaryKey 隱含
-	Username           string         `gorm:"type:varchar(255);unique"`
+	Username           *string        `gorm:"type:varchar(255);unique"`
 	Email              *string        `gorm:"type:varchar(255);unique"`
 	EncryptedPassword  *string        `gorm:"type:varchar(255)"`
 	ConfirmedAt        *time.Time     `gorm:"type:timestamptz"`
@@ -32,7 +32,7 @@ func (User) TableName() string {
 }
 
 type Identity struct {
-	ID           string         `gorm:"type:varchar(21);primaryKey;not null"` // DEFAULT nanoid() 由資料庫端處理
+	ID           string         `gorm:"type:varchar(21);primaryKey;default:nanoid();not null"`
 	ProviderID   string         `gorm:"type:text;not null;uniqueIndex:uq_auth_idp_id"`
 	UserID       string         `gorm:"type:varchar(21);not null;index"` // 外鍵，建議加上索引
 	IdentityData datatypes.JSON `gorm:"type:jsonb;not null"`
