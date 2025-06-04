@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: <project_ref>-ingress
+  namespace: baas
+spec:
+  entryPoints:
+    - postgres
+  routes:
+    - match: HostSNI(`<project_ref>.<baas_host>`)
+      services:
+        - name: <project_ref>-rw
+          port: 5432
+  tls:
+    secretName: baas-wildcard-tls

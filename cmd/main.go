@@ -2,14 +2,13 @@ package main
 
 import (
 	"baas-api/internal/configs"
+	"baas-api/internal/controllers"
 	"baas-api/internal/repo"
 	"baas-api/internal/router"
-	"log"
-	"os"
+	"baas-api/internal/services"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormLogger "gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
 
@@ -18,11 +17,6 @@ func main() {
 
 	//////////// Init Gorm Database //////////
 	db, err := gorm.Open(postgres.Open(config.DatabaseURL), &gorm.Config{
-		Logger: gormLogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormLogger.Config{
-			// SlowThreshold: time.Second,
-			LogLevel: gormLogger.Info,
-			Colorful: true,
-		}),
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: false,
 			NoLowerCase:   false,
@@ -31,12 +25,24 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	//////////// Init Cache //////////
+	// cache := cache.New(15*time.Minute, 20*time.Minute)
 
 	//////////// Init Repo, Service //////////
+	// Repositories
 	projectRepo := repo.NewProjectRepository(db)
 	kubeProjectRepo := repo.NewKubeProjectRepository(config)
+	// entityRepo := repo.NewEntityRepository(db, cache)
+	// userRepo := repo.NewUserRepository(db, cache)
+	// Services
+	projectService := services.NewProjectService(config, projectRepo, kubeProjectRepo)
+	// authService := services.NewAuthService(config, entityRepo, userRepo)
 
-	cli := router.NewAPI(config, projectRepo)
+	//////////// Init Controllers //////////
+	// authController := controllers.NewAuthController(config, authService)
+	projectController := controllers.NewProjectController(projectService)
+
+	cli := router.NewAPI(config, projectController)
 
 	cli.Run()
 }

@@ -5,9 +5,9 @@ import (
 	"regexp"
 )
 
-var ErrInvalidReference = errors.New("invalid reference format, must be exactly 20 alphabetic characters [a-zA-Z]")
+var ErrInvalidReference = errors.New("invalid reference format, must be exactly 20 lower alphabetic characters [a-z]")
 
-var refRegex = regexp.MustCompile(`^[a-zA-Z]{20}$`)
+var refRegex = regexp.MustCompile(`^[a-z]{20}$`)
 
 // Project 對應 dbo.projects 資料表
 type Project struct {

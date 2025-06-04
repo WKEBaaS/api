@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/lestrrat-go/jwx/v3/jwk"
@@ -21,12 +22,15 @@ type Config struct {
 		PrivateKey jwk.Key
 		PublicKey  jwk.Key
 		Issuer     string
-		ExpireIn   int
+		ExpireIn   time.Duration
 	}
 	Kube struct {
-		ConfigPath        string
-		ProjectsNamespace string
+		ConfigPath                    string
+		ProjectsNamespace             string
+		ProjectsWildcardTLSSecretName string
 	}
+
+	PROJECTS_HOST string
 }
 
 func LoadConfig() *Config {
@@ -50,18 +54,21 @@ func LoadConfig() *Config {
 		panic(fmt.Sprintf("Failed to get public key %s", err))
 	}
 
-	c.JWK.ExpireIn = func() int {
+	c.JWK.ExpireIn = func() time.Duration {
 		valueStr := os.Getenv("JWT_EXPIRE_IN")
 		if value, err := strconv.Atoi(valueStr); err == nil {
-			return value
+			return time.Duration(value) * time.Second
 		}
 		// Default to 7 days
-		return 604800
+		return 7 * 24 * time.Hour
 	}()
 	c.JWK.Issuer = os.Getenv("JWT_ISSUER")
 
 	c.Kube.ConfigPath = os.Getenv("KUBE_CONFIG_PATH")
 	c.Kube.ProjectsNamespace = os.Getenv("KUBE_PROJECTS_NAMESPACE")
+	c.Kube.ProjectsWildcardTLSSecretName = os.Getenv("KUBE_PROJECTS_WILDCARD_TLS_SECRET_NAME")
+
+	c.PROJECTS_HOST = os.Getenv("PROJECTS_HOST")
 
 	return c
 }

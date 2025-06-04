@@ -6,6 +6,22 @@ import (
 	"gorm.io/gorm"
 )
 
+type Entity struct {
+	ID           string    `gorm:"type:varchar(21);primaryKey;unique;not null"`
+	Rank         int       `gorm:"column:rank;<-:false"` // `<-:false` prevents GORM from writing to this column
+	ChineseName  string    `gorm:"type:varchar(50);column:chinese_name"`
+	EnglishName  string    `gorm:"type:varchar(50);column:english_name"`
+	IsRelational bool      `gorm:"column:is_relational;default:false;not null"`
+	IsHideable   bool      `gorm:"column:is_hideable;default:false;not null"`
+	IsDeletable  bool      `gorm:"column:is_deletable;default:false;not null"`
+	CreatedAt    time.Time `gorm:"column:created_at;not null"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (Entity) TableName() string {
+	return "dbo.entities"
+}
+
 type Object struct {
 	ID                 string         `gorm:"type:varchar(21);primaryKey;default:nanoid();unique"`
 	EntityID           *string        `gorm:"type:varchar(21)"` // 可為 NULL，使用指標

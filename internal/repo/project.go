@@ -16,7 +16,6 @@ var (
 	ErrProjectNotFound     = errors.New("project not found")
 	ErrCreateProjectFailed = errors.New("failed to create project")
 	ErrDeleteProjectFailed = errors.New("failed to delete project")
-	ErrTransactionFailed   = errors.New("database transaction failed")
 )
 
 type ProjectRepository interface {
@@ -53,7 +52,7 @@ func NewProjectRepository(db *gorm.DB) ProjectRepository {
 }
 
 func (r *projectRepository) CreateProject(ctx context.Context, name string) (*string, *string, error) {
-	ref := gonanoid.MustGenerate(string(lo.LettersCharset), 20)
+	ref := gonanoid.MustGenerate(string(lo.LowerCaseLettersCharset), 20)
 
 	object := &models.Object{
 		ChineseName: lo.ToPtr(name),

@@ -1,6 +1,7 @@
 CREATE TABLE auth.users
 (
     id                   VARCHAR(21)  NOT NULL UNIQUE,
+    username             VARCHAR(255) NULL UNIQUE,
     email                VARCHAR(255) NULL UNIQUE,
     encrypted_password   VARCHAR(255) NULL,
     confirmed_at         timestamptz  NULL,
