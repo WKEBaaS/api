@@ -66,9 +66,9 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 	}
 
 	var idTokenClaims struct {
-		DisplayName string `json:"name"`
-		Email       string `json:"email"`
-		Username    string `json:"preferred_username"`
+		DisplayName string  `json:"name"`
+		Email       *string `json:"email"`
+		Username    string  `json:"preferred_username"`
 	}
 	if err := idToken.Claims(&idTokenClaims); err != nil {
 		slog.ErrorContext(ctx, "Failed to parse ID token claims", "error", err)
@@ -87,14 +87,19 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 			return nil, err
 		}
 
+		var identityData datatypes.JSON
+		if idTokenClaims.Email != nil {
+			identityData = datatypes.JSON(fmt.Appendf(nil, `{"email":"%s"}`, *idTokenClaims.Email))
+		}
+
 		id, err := s.userRepo.CreateUserFromIdentity(ctx, &repo.CreateUserFromIdentityInput{
 			UserEntityID: userEntityID.ID,
 			Name:         idTokenClaims.DisplayName,
-			Email:        &idTokenClaims.Email,
+			Email:        idTokenClaims.Email,
 			Username:     idTokenClaims.Username,
 			Provider:     "keycloak",
 			ProviderID:   idToken.Subject,
-			IdentityData: datatypes.JSON(fmt.Appendf(nil, `{"email":"%s"}`, idTokenClaims.Email)),
+			IdentityData: identityData,
 		})
 		if err != nil {
 			return nil, err

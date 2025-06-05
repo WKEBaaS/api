@@ -2,6 +2,8 @@ package configs
 
 import (
 	"log"
+	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -18,6 +20,7 @@ type Config struct {
 		ClientSecret string
 		Issuer       string
 		RedirectURL  string
+		LogoutURL    string
 	}
 	JWK struct {
 		PrivateKey jwk.Key
@@ -45,7 +48,16 @@ func LoadConfig() *Config {
 	c.Keycloak.Issuer = os.Getenv("KEYCLOAK_ISSUER")
 	c.Keycloak.RedirectURL = os.Getenv("KEYCLOAK_REDIRECT_URL")
 
-	var err error
+	logoutUrl, err := url.Parse(c.Keycloak.Issuer + "/protocol/openid-connect/logout")
+	if err != nil {
+		slog.Error("Failed to parse logout URL", "error", err)
+		panic(err)
+	}
+	logoutUrlQuery := logoutUrl.Query()
+	logoutUrlQuery.Set("client_id", c.Keycloak.ClientId)
+	logoutUrl.RawQuery = logoutUrlQuery.Encode()
+	c.Keycloak.LogoutURL = logoutUrl.String()
+
 	c.JWK.PrivateKey, err = jwk.ParseKey([]byte(os.Getenv("JWK_PRIVATE_KEY")))
 	if err != nil {
 		log.Fatalf("Failed to parse private key %s", err)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/danielgtaylor/huma/v2"
@@ -19,13 +20,16 @@ type AuthController interface {
 	authMiddleware(ctx huma.Context, next func(huma.Context))
 	authLogin(ctx context.Context, input *dto.AuthLoginInput) (*dto.AuthLoginOutput, error)
 	authCallback(ctx context.Context, input *dto.AuthCallbackInput) (*dto.AuthCallbackOutput, error)
+	authLogout(ctx context.Context, input *dto.AuthLogoutInput) (*dto.AuthLogoutOutput, error)
 }
 
 type authController struct {
+	logoutUrl    string
 	authService  services.AuthService
 	oauth2Config oauth2.Config
 	provider     *oidc.Provider
 	verifier     *oidc.IDTokenVerifier
+	config       *configs.Config
 }
 
 func NewAuthController(config *configs.Config, authService services.AuthService) AuthController {
@@ -50,6 +54,7 @@ func NewAuthController(config *configs.Config, authService services.AuthService)
 		oauth2Config: oauth2Config,
 		provider:     provider,
 		verifier:     verifier,
+		config:       config,
 	}
 }
 
@@ -73,6 +78,16 @@ func (c *authController) RegisterAuthAPIs(api huma.API) {
 		Tags:        []string{"Auth"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, c.authCallback)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "auth-logout",
+		Method:      http.MethodGet,
+		Path:        "/auth/logout",
+		Summary:     "Logout",
+		Description: "Logout from Keycloak",
+		Tags:        []string{"Auth"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
+	}, c.authLogout)
 }
 
 func (c *authController) authMiddleware(ctx huma.Context, next func(huma.Context)) {
@@ -106,6 +121,23 @@ func (c *authController) authCallback(ctx context.Context, in *dto.AuthCallbackI
 	if err != nil {
 		return nil, err
 	}
+
+	return out, nil
+}
+
+func (c *authController) authLogout(ctx context.Context, input *dto.AuthLogoutInput) (*dto.AuthLogoutOutput, error) {
+	tls, ok := ctx.Value("TLS").(bool)
+	if !ok {
+		return nil, huma.Error500InternalServerError("context value TLS not found ")
+	}
+
+	out := &dto.AuthLogoutOutput{}
+
+	// delete the token cookie
+	out.TokenCookie = &http.Cookie{Name: "token", Value: "", Path: "/", HttpOnly: true, Secure: tls, Expires: time.Unix(0, 0)}
+
+	out.Status = http.StatusFound
+	out.Url = c.config.Keycloak.LogoutURL
 
 	return out, nil
 }
