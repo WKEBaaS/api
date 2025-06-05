@@ -61,7 +61,6 @@ func (c *authController) RegisterAuthAPIs(api huma.API) {
 		Summary:     "Login with Keycloak",
 		Description: "Login with Keycloak",
 		Tags:        []string{"Auth"},
-
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, c.authLogin)
 
@@ -72,6 +71,7 @@ func (c *authController) RegisterAuthAPIs(api huma.API) {
 		Summary:     "Callback",
 		Description: "Callback",
 		Tags:        []string{"Auth"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, c.authCallback)
 }
 
@@ -97,10 +97,15 @@ func (c *authController) authLogin(ctx context.Context, input *dto.AuthLoginInpu
 }
 
 func (c *authController) authCallback(ctx context.Context, in *dto.AuthCallbackInput) (*dto.AuthCallbackOutput, error) {
-	c.authService.AuthCallback(ctx, in, &c.oauth2Config, c.verifier)
+	tls, ok := ctx.Value("TLS").(bool)
+	if !ok {
+		return nil, huma.Error500InternalServerError("context value TLS not found ")
+	}
 
-	resp := &dto.AuthCallbackOutput{}
-	resp.Status = http.StatusOK
-	resp.Body.Message = "Authentication successful"
-	return resp, nil
+	out, err := c.authService.AuthCallback(ctx, in, tls, &c.oauth2Config, c.verifier)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }

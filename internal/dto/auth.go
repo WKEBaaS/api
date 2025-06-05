@@ -27,7 +27,6 @@ type AuthCallbackOutput struct {
 	Url         string       `header:"Location"`
 	TokenCookie *http.Cookie `header:"Set-Cookie"`
 	Body        struct {
-		Message string `json:"message"`
-		Ok      bool   `json:"ok" doc:"true if the request was successful"`
+		Ok bool `json:"ok" doc:"true if the request was successful"`
 	}
 }

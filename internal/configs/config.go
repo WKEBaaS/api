@@ -1,12 +1,13 @@
 package configs
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
@@ -21,6 +22,7 @@ type Config struct {
 	JWK struct {
 		PrivateKey jwk.Key
 		PublicKey  jwk.Key
+		Algorithm  jwa.KeyAlgorithm
 		Issuer     string
 		ExpireIn   time.Duration
 	}
@@ -46,12 +48,18 @@ func LoadConfig() *Config {
 	var err error
 	c.JWK.PrivateKey, err = jwk.ParseKey([]byte(os.Getenv("JWK_PRIVATE_KEY")))
 	if err != nil {
-		panic(fmt.Sprintf("Failed to parse private key %s", err))
+		log.Fatalf("Failed to parse private key %s", err)
 	}
 
 	c.JWK.PublicKey, err = jwk.PublicKeyOf(c.JWK.PrivateKey)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get public key %s", err))
+		log.Fatalf("Failed to get public key %s", err)
+	}
+
+	var ok bool
+	c.JWK.Algorithm, ok = c.JWK.PrivateKey.Algorithm()
+	if !ok {
+		panic("Failed to get algorithm from JWK private key")
 	}
 
 	c.JWK.ExpireIn = func() time.Duration {

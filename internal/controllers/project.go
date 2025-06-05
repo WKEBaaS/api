@@ -31,6 +31,7 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Path:        "/project",
 		Summary:     "Create Project",
 		Description: "Create a new project with the specified name and storage size.",
+		Tags:        []string{"Project"},
 	}, c.createProject)
 
 	huma.Register(api, huma.Operation{
@@ -39,6 +40,7 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Path:        "/project/by-ref",
 		Summary:     "Delete Project by Reference",
 		Description: "Delete a project by its reference. The reference is a 20-character string.",
+		Tags:        []string{"Project"},
 	}, c.deleteProjectByRef)
 }
 

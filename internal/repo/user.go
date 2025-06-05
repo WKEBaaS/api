@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/patrickmn/go-cache"
 	"gorm.io/datatypes"
@@ -14,6 +15,7 @@ import (
 var (
 	ErrCreateUserFailed                  = errors.New("failed to create user")
 	ErrFailedToCheckUserExistsByProvider = errors.New("failed to check if user exists by provider and ID")
+	ErrFailedToGetUserIDByProvider       = errors.New("failed to get user ID by provider and ID")
 )
 
 type CreateUserFromIdentityInput struct {
@@ -34,8 +36,11 @@ type UserRepository interface {
 	//
 	// Returns the user ID if successful, or an error if the operation fails.
 	CreateUserFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error)
-	// Check if the user exists by provider and provider ID.
-	CheckUserExistsByProviderAndID(ctx context.Context, provider, providerID string) (bool, error)
+	// GetUserIDByProviderAndID 透過 provider 和 providerID 取得使用者 ID
+	// 如果找到，則回傳使用者 ID 和 true
+	// 如果找不到，則回傳 0 和 false (假設 UserID 是 uint)
+	// 如果發生其他錯誤，則回傳 0 和錯誤
+	GetUserIDByProviderAndID(ctx context.Context, provider, providerID string) (*string, bool, error)
 }
 
 type userRepository struct {
@@ -87,30 +92,39 @@ func (r *userRepository) CreateUserFromIdentity(ctx context.Context, in *CreateU
 		return nil
 	})
 
-	// update user existing cache
-	r.cache.Set("user"+in.Provider+in.ProviderID, true, cache.DefaultExpiration)
+	// update userid to cache
+	r.cache.Set("userid"+in.Provider+in.ProviderID, user.ID, cache.DefaultExpiration)
 
 	return &user.ID, err
 }
 
-func (r *userRepository) CheckUserExistsByProviderAndID(ctx context.Context, provider, providerID string) (bool, error) {
-	// Check cache first
-	var exists bool
-	if cachedExists, found := r.cache.Get("user" + provider + providerID); found {
-		exists = cachedExists.(bool)
-		return exists, nil
+func (r *userRepository) GetUserIDByProviderAndID(ctx context.Context, provider, providerID string) (*string, bool, error) {
+	// 嘗試從快取中取得 UserID
+	cacheKey := "userid:" + provider + ":" + providerID
+	if cachedUserID, found := r.cache.Get(cacheKey); found {
+		if userID, ok := cachedUserID.(string); ok {
+			slog.InfoContext(ctx, "User ID retrieved from cache", "provider", provider, "provider_id", providerID, "user_id", userID)
+			return &userID, userID != "", nil
+		}
 	}
 
-	var count int64
-	if err := r.db.WithContext(ctx).Model(&models.Identity{}).
+	var identity models.Identity
+	err := r.db.WithContext(ctx).
+		Select("user_id"). // 只選擇 user_id 欄位
 		Where("provider = ? AND provider_id = ?", provider, providerID).
-		Count(&count).Error; err != nil {
-		slog.ErrorContext(ctx, "Failed to check user existence by provider and ID", "error", err)
-		return false, ErrFailedToCheckUserExistsByProvider
+		First(&identity).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			r.cache.Set(cacheKey, "", 5*time.Minute) // 快取 0 表示找不到，例如 5 分鐘
+			slog.InfoContext(ctx, "User ID not found in DB", "provider", provider, "provider_id", providerID)
+			return nil, false, nil // 找不到使用者
+		}
+		slog.ErrorContext(ctx, "Failed to get user ID by provider and ID from DB", "error", err, "provider", provider, "provider_id", providerID)
+		return nil, false, ErrFailedToGetUserIDByProvider // 其他資料庫錯誤
 	}
 
 	// Store the result in cache
-	r.cache.Set("user"+provider+providerID, count > 0, cache.DefaultExpiration)
+	r.cache.Set(cacheKey, identity.UserID, cache.DefaultExpiration)
 
-	return count > 0, nil
+	return &identity.UserID, true, nil
 }
