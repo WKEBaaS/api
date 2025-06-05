@@ -30,12 +30,14 @@ type Config struct {
 		ExpireIn   time.Duration
 	}
 	Kube struct {
-		ConfigPath                    string
-		ProjectsNamespace             string
-		ProjectsWildcardTLSSecretName string
+		ConfigPath           string
+		ProjectsNamespace    string
+		ProjectTLSSecretName string
 	}
 
-	PROJECTS_HOST string
+	BaaS struct {
+		Home url.URL
+	}
 }
 
 func LoadConfig() *Config {
@@ -86,9 +88,16 @@ func LoadConfig() *Config {
 
 	c.Kube.ConfigPath = os.Getenv("KUBE_CONFIG_PATH")
 	c.Kube.ProjectsNamespace = os.Getenv("KUBE_PROJECTS_NAMESPACE")
-	c.Kube.ProjectsWildcardTLSSecretName = os.Getenv("KUBE_PROJECTS_WILDCARD_TLS_SECRET_NAME")
+	c.Kube.ProjectTLSSecretName = os.Getenv("KUBE_PROJECTS_TLS_SECRET_NAME")
 
-	c.PROJECTS_HOST = os.Getenv("PROJECTS_HOST")
+	// c.BAAS_HOST = os.Getenv("PROJECTS_HOST")
+	baasHomeURL, err := url.Parse(os.Getenv("BAAS_HOME_URL"))
+	if err != nil {
+		slog.Error("Failed to parse BaaS home URL", "error", err)
+		panic(err)
+	}
+
+	c.BaaS.Home = *baasHomeURL
 
 	return c
 }

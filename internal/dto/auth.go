@@ -3,7 +3,7 @@ package dto
 import "net/http"
 
 type AuthLoginInput struct {
-	RedirectURL string `query:"redirect_url" example:"http://example.com" doc:"Redirect URL"`
+	RedirectURL *string `query:"redirect_url" example:"http://example.com" doc:"Redirect URL"`
 }
 
 type AuthLoginOutput struct {

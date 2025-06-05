@@ -57,11 +57,10 @@ type KubeProjectRepository interface {
 }
 
 type kubeProjectRepository struct {
-	kubeConfig                    *rest.Config
-	clientset                     *kubernetes.Clientset
-	dynamicClient                 *dynamic.DynamicClient
-	projectsHost                  string
-	projectsWildcardTLSSecretName string
+	kubeConfig    *rest.Config
+	clientset     *kubernetes.Clientset
+	dynamicClient *dynamic.DynamicClient
+	config        *configs.Config
 }
 
 func NewKubeProjectRepository(config *configs.Config) KubeProjectRepository {
@@ -82,8 +81,7 @@ func NewKubeProjectRepository(config *configs.Config) KubeProjectRepository {
 	repo.kubeConfig = kc
 	repo.clientset = clientset
 	repo.dynamicClient = dynamicClient
-	repo.projectsHost = config.PROJECTS_HOST
-	repo.projectsWildcardTLSSecretName = config.Kube.ProjectsWildcardTLSSecretName
+	repo.config = config
 
 	return repo
 }
@@ -227,7 +225,7 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 	ingressRouteTCPUnstructured.SetNamespace(namespace)
 
 	// set spec.routes[0]
-	projectHostSNI := fmt.Sprintf("HostSNI(`%s.%s`)", ref, r.projectsHost)
+	projectHostSNI := fmt.Sprintf("HostSNI(`%s.%s`)", ref, &r.config.BaaS.Home.Host)
 	serviceName := fmt.Sprintf("%s-rw", ref)
 	unstructured.SetNestedSlice(ingressRouteTCPUnstructured.Object, []any{
 		map[string]any{
@@ -241,7 +239,7 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 		},
 	}, "spec", "routes")
 	// set spec.tls.secretName
-	if err := unstructured.SetNestedField(ingressRouteTCPUnstructured.Object, r.projectsWildcardTLSSecretName, "spec", "tls", "secretName"); err != nil {
+	if err := unstructured.SetNestedField(ingressRouteTCPUnstructured.Object, r.config.Kube.ProjectTLSSecretName, "spec", "tls", "secretName"); err != nil {
 		slog.Error("Failed to set TLS secret name in IngressRouteTCP spec", "error", err)
 		return ErrFailedToSetSpecTLSSecretName
 	}

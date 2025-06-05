@@ -103,7 +103,13 @@ func (c *authController) authLogin(ctx context.Context, input *dto.AuthLoginInpu
 	if !ok {
 		return nil, huma.Error500InternalServerError("context value TLS not found ")
 	}
-	resp.RedirectCookie = &http.Cookie{Name: "redirect_url", Value: input.RedirectURL, Path: "/", HttpOnly: true, Secure: tls}
+
+	if input.RedirectURL == nil {
+		home := c.config.BaaS.Home.String()
+		input.RedirectURL = &home
+	}
+
+	resp.RedirectCookie = &http.Cookie{Name: "redirect_url", Value: *input.RedirectURL, Path: "/", HttpOnly: true, Secure: tls}
 	resp.StateCookie = &http.Cookie{Name: "state", Value: state, Path: "/", HttpOnly: true, Secure: tls}
 	resp.NonceCookie = &http.Cookie{Name: "nonce", Value: nonce, Path: "/", HttpOnly: true, Secure: tls}
 	resp.Status = http.StatusFound
