@@ -1,9 +1,12 @@
 package dto
 
-import "net/http"
+import (
+	"net/http"
+	"net/url"
+)
 
 type AuthLoginInput struct {
-	RedirectURL *string `query:"redirect_url" example:"http://example.com" doc:"Redirect URL"`
+	RedirectURL string `query:"redirect_url" example:"http://example.com" doc:"Redirect URL" required:"false"`
 }
 
 type AuthLoginOutput struct {
@@ -31,10 +34,12 @@ type AuthCallbackOutput struct {
 	}
 }
 
-type AuthLogoutInput struct{}
+type AuthLogoutInput struct {
+	PostLogoutRedirectURI string `query:"post_logout_redirect_uri" example:"http://example.com" doc:"Post logout redirect URI" required:"false"`
+}
 
 type AuthLogoutOutput struct {
 	Status      int
-	Url         string       `header:"Location"`
+	Url         url.URL      `header:"Location"`
 	TokenCookie *http.Cookie `header:"Set-Cookie" doc:"Token cookie to be cleared"`
 }

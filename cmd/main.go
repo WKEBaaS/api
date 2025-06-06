@@ -3,9 +3,11 @@ package main
 import (
 	"baas-api/internal/configs"
 	"baas-api/internal/controllers"
+	"baas-api/internal/i3s"
 	"baas-api/internal/repo"
 	"baas-api/internal/router"
 	"baas-api/internal/services"
+	"log"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -27,6 +29,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	//////////// Migrate I3S Schema //////////
+	i3s := i3s.NewI3S(config)
+	if err := i3s.Migrate(); err != nil {
+		log.Fatalf("failed to migrate database: %v\n", err)
+	}
+
 	//////////// Init Cache //////////
 	cache := cache.New(15*time.Minute, 20*time.Minute)
 
@@ -42,9 +51,9 @@ func main() {
 
 	//////////// Init Controllers //////////
 	authController := controllers.NewAuthController(config, authService)
-	projectController := controllers.NewProjectController(projectService)
+	projectController := controllers.NewProjectController(config, projectService)
 
-	cli := router.NewAPI(config, authController, projectController)
+	cli := router.NewApiCli(config, authController, projectController)
 
 	cli.Run()
 }

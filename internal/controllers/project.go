@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"baas-api/internal/configs"
+	"baas-api/internal/controllers/middlewares"
 	"baas-api/internal/dto"
 	"baas-api/internal/services"
 	"context"
@@ -15,16 +17,35 @@ type ProjectController interface {
 }
 
 type projectController struct {
+	config         *configs.Config
 	projectService services.ProjectService
 }
 
-func NewProjectController(projectService services.ProjectService) ProjectController {
+func NewProjectController(config *configs.Config, projectService services.ProjectService) ProjectController {
 	return &projectController{
+		config:         config,
 		projectService: projectService,
 	}
 }
 
 func (c *projectController) RegisterProjectAPIs(api huma.API) {
+	authMiddleware := middlewares.NewAuthMiddleWare(api, c.config, "baasAuth")
+
+	huma.Register(api, huma.Operation{
+		OperationID: "test",
+		Method:      "GET",
+		Path:        "/test",
+		Summary:     "Test Endpoint",
+		Description: "A simple test endpoint to verify the API is working.",
+		Tags:        []string{"Test"},
+		Security: []map[string][]string{
+			{"baasAuth": {"project:create"}},
+		},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, func(ctx context.Context, in *struct{}) (*struct{}, error) {
+		return nil, nil
+	})
+
 	huma.Register(api, huma.Operation{
 		OperationID: "create-project",
 		Method:      "POST",
@@ -32,6 +53,10 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Summary:     "Create Project",
 		Description: "Create a new project with the specified name and storage size.",
 		Tags:        []string{"Project"},
+		Security: []map[string][]string{
+			{"baasAuth": {"project:create"}},
+		},
+		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.createProject)
 
 	huma.Register(api, huma.Operation{

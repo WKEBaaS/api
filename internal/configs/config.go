@@ -20,7 +20,7 @@ type Config struct {
 		ClientSecret string
 		Issuer       string
 		RedirectURL  string
-		LogoutURL    string
+		LogoutURL    url.URL
 	}
 	JWK struct {
 		PrivateKey jwk.Key
@@ -58,7 +58,7 @@ func LoadConfig() *Config {
 	logoutUrlQuery := logoutUrl.Query()
 	logoutUrlQuery.Set("client_id", c.Keycloak.ClientId)
 	logoutUrl.RawQuery = logoutUrlQuery.Encode()
-	c.Keycloak.LogoutURL = logoutUrl.String()
+	c.Keycloak.LogoutURL = *logoutUrl
 
 	c.JWK.PrivateKey, err = jwk.ParseKey([]byte(os.Getenv("JWK_PRIVATE_KEY")))
 	if err != nil {

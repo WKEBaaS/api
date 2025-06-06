@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/coreos/go-oidc"
@@ -27,7 +26,7 @@ var (
 )
 
 type AuthService interface {
-	AuthCallback(ctx context.Context, in *dto.AuthCallbackInput, secure bool, oauth2Config *oauth2.Config, verifier *oidc.IDTokenVerifier) (*dto.AuthCallbackOutput, error)
+	AuthCallback(ctx context.Context, in *dto.AuthCallbackInput, oauth2Config *oauth2.Config, verifier *oidc.IDTokenVerifier) ([]byte, error)
 }
 
 type authService struct {
@@ -44,7 +43,7 @@ func NewAuthService(config *configs.Config, entiryRepo repo.EntityRepository, us
 	}
 }
 
-func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInput, secure bool, oauth2Config *oauth2.Config, verifier *oidc.IDTokenVerifier) (*dto.AuthCallbackOutput, error) {
+func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInput, oauth2Config *oauth2.Config, verifier *oidc.IDTokenVerifier) ([]byte, error) {
 	oauth2Token, err := oauth2Config.Exchange(ctx, in.Code)
 	if err != nil {
 		return nil, err
@@ -66,9 +65,10 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 	}
 
 	var idTokenClaims struct {
-		DisplayName string  `json:"name"`
-		Email       *string `json:"email"`
-		Username    string  `json:"preferred_username"`
+		DisplayName string   `json:"name"`
+		Email       *string  `json:"email"`
+		Username    string   `json:"preferred_username"`
+		BaaSRoles   []string `json:"baas_roles"`
 	}
 	if err := idToken.Claims(&idTokenClaims); err != nil {
 		slog.ErrorContext(ctx, "Failed to parse ID token claims", "error", err)
@@ -115,6 +115,7 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 		Claim("email", idTokenClaims.Email).
 		Claim("displayName", idTokenClaims.DisplayName).
 		Claim("username", idTokenClaims.Username).
+		Claim("baas_roles", idTokenClaims.BaaSRoles).
 		Build()
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to build JWT token", "error", err)
@@ -127,11 +128,5 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 		return nil, ErrFailedToSignJWTToken
 	}
 
-	out := &dto.AuthCallbackOutput{}
-	out.Status = http.StatusFound
-	out.Body.Ok = true
-	out.TokenCookie = &http.Cookie{Name: "token", Value: string(signedToken), Path: "/", HttpOnly: true, Secure: secure}
-	out.Url = in.RedirectURL
-
-	return out, nil
+	return signedToken, nil
 }

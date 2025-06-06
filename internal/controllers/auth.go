@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"baas-api/internal/configs"
+	"baas-api/internal/controllers/middlewares"
 	"baas-api/internal/dto"
 	"baas-api/internal/services"
 	"context"
@@ -17,7 +18,6 @@ import (
 
 type AuthController interface {
 	RegisterAuthAPIs(api huma.API)
-	authMiddleware(ctx huma.Context, next func(huma.Context))
 	authLogin(ctx context.Context, input *dto.AuthLoginInput) (*dto.AuthLoginOutput, error)
 	authCallback(ctx context.Context, input *dto.AuthCallbackInput) (*dto.AuthCallbackOutput, error)
 	authLogout(ctx context.Context, input *dto.AuthLogoutInput) (*dto.AuthLogoutOutput, error)
@@ -66,7 +66,7 @@ func (c *authController) RegisterAuthAPIs(api huma.API) {
 		Summary:     "Login with Keycloak",
 		Description: "Login with Keycloak",
 		Tags:        []string{"Auth"},
-		Middlewares: huma.Middlewares{c.authMiddleware},
+		Middlewares: huma.Middlewares{middlewares.TLSMiddleware},
 	}, c.authLogin)
 
 	huma.Register(api, huma.Operation{
@@ -76,7 +76,7 @@ func (c *authController) RegisterAuthAPIs(api huma.API) {
 		Summary:     "Callback",
 		Description: "Callback",
 		Tags:        []string{"Auth"},
-		Middlewares: huma.Middlewares{c.authMiddleware},
+		Middlewares: huma.Middlewares{middlewares.TLSMiddleware},
 	}, c.authCallback)
 
 	huma.Register(api, huma.Operation{
@@ -86,16 +86,11 @@ func (c *authController) RegisterAuthAPIs(api huma.API) {
 		Summary:     "Logout",
 		Description: "Logout from Keycloak",
 		Tags:        []string{"Auth"},
-		Middlewares: huma.Middlewares{c.authMiddleware},
+		Middlewares: huma.Middlewares{middlewares.TLSMiddleware},
 	}, c.authLogout)
 }
 
-func (c *authController) authMiddleware(ctx huma.Context, next func(huma.Context)) {
-	ctx = huma.WithValue(ctx, "TLS", ctx.TLS() != nil)
-	next(ctx)
-}
-
-func (c *authController) authLogin(ctx context.Context, input *dto.AuthLoginInput) (*dto.AuthLoginOutput, error) {
+func (c *authController) authLogin(ctx context.Context, in *dto.AuthLoginInput) (*dto.AuthLoginOutput, error) {
 	resp := &dto.AuthLoginOutput{}
 	state := uuid.New().String()
 	nonce := uuid.New().String()
@@ -104,12 +99,7 @@ func (c *authController) authLogin(ctx context.Context, input *dto.AuthLoginInpu
 		return nil, huma.Error500InternalServerError("context value TLS not found ")
 	}
 
-	if input.RedirectURL == nil {
-		home := c.config.BaaS.Home.String()
-		input.RedirectURL = &home
-	}
-
-	resp.RedirectCookie = &http.Cookie{Name: "redirect_url", Value: *input.RedirectURL, Path: "/", HttpOnly: true, Secure: tls}
+	resp.RedirectCookie = &http.Cookie{Name: "redirect_url", Value: in.RedirectURL, Path: "/", HttpOnly: true, Secure: tls}
 	resp.StateCookie = &http.Cookie{Name: "state", Value: state, Path: "/", HttpOnly: true, Secure: tls}
 	resp.NonceCookie = &http.Cookie{Name: "nonce", Value: nonce, Path: "/", HttpOnly: true, Secure: tls}
 	resp.Status = http.StatusFound
@@ -123,10 +113,16 @@ func (c *authController) authCallback(ctx context.Context, in *dto.AuthCallbackI
 		return nil, huma.Error500InternalServerError("context value TLS not found ")
 	}
 
-	out, err := c.authService.AuthCallback(ctx, in, tls, &c.oauth2Config, c.verifier)
+	signedToken, err := c.authService.AuthCallback(ctx, in, &c.oauth2Config, c.verifier)
 	if err != nil {
 		return nil, err
 	}
+
+	out := &dto.AuthCallbackOutput{}
+	out.Status = http.StatusFound
+	out.Body.Ok = true
+	out.TokenCookie = &http.Cookie{Name: "token", Value: string(signedToken), Path: "/", HttpOnly: true, Secure: tls}
+	out.Url = in.RedirectURL
 
 	return out, nil
 }
@@ -144,6 +140,13 @@ func (c *authController) authLogout(ctx context.Context, input *dto.AuthLogoutIn
 
 	out.Status = http.StatusFound
 	out.Url = c.config.Keycloak.LogoutURL
+
+	// add the post_logout_redirect_uri if provided
+	if input.PostLogoutRedirectURI != "" {
+		query := out.Url.Query()
+		query.Set("post_logout_redirect_uri", input.PostLogoutRedirectURI)
+		out.Url.RawQuery = query.Encode()
+	}
 
 	return out, nil
 }
