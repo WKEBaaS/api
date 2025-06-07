@@ -19,26 +19,26 @@ var (
 )
 
 type ProjectRepository interface {
-	// Crete Project
+	// Crete
 	//
 	// params:
 	// 	@param name project name
 	// 	@param ref  must contain exactly 20 alphabetic characters [a-zA-Z]
 	//
 	// @return id, ref of the created project
-	CreateProject(ctx context.Context, name string) (*string, *string, error)
-	// DeleteProjectByIDSoft 依 ID 軟刪除專案 (及其關聯的 Object)。
-	DeleteProjectByIDSoft(ctx context.Context, id string) error
-	// DeleteProjectByIDPermanently 依 ID 永久刪除專案 (及其關聯的 Object)。
-	DeleteProjectByIDPermanently(ctx context.Context, id string) error
-	// DeleteProjectByRefSoft 依 Reference 軟刪除專案 (及其關聯的 Object)。
-	DeleteProjectByRefSoft(ctx context.Context, ref string) error
-	// DeleteProjectByRefPermanently 依 Reference 永久刪除專案 (及其關聯的 Object)。
-	DeleteProjectByRefPermanently(ctx context.Context, ref string) error
-	// GetProjectByID 依 ID 取得專案詳細資訊 (包含關聯的 Object)。
-	GetProjectByID(ctx context.Context, id string) (*models.Project, error)
-	// GetProjectByRef 依 Reference 取得專案詳細資訊 (包含關聯的 Object)。
-	GetProjectByRef(ctx context.Context, ref string) (*models.Project, error)
+	Create(ctx context.Context, name string) (*string, *string, error)
+	// DeleteByIDSoft 依 ID 軟刪除專案 (及其關聯的 Object)。
+	DeleteByIDSoft(ctx context.Context, id string) error
+	// DeleteByIDPermanently 依 ID 永久刪除專案 (及其關聯的 Object)。
+	DeleteByIDPermanently(ctx context.Context, id string) error
+	// DeleteByRefSoft 依 Reference 軟刪除專案 (及其關聯的 Object)。
+	DeleteByRefSoft(ctx context.Context, ref string) error
+	// DeleteByRefPermanently 依 Reference 永久刪除專案 (及其關聯的 Object)。
+	DeleteByRefPermanently(ctx context.Context, ref string) error
+	// GetByID 依 ID 取得專案詳細資訊 (包含關聯的 Object)。
+	GetByID(ctx context.Context, id string) (*models.Project, error)
+	// GetByRef 依 Reference 取得專案詳細資訊 (包含關聯的 Object)。
+	GetByRef(ctx context.Context, ref string) (*models.Project, error)
 }
 
 type projectRepository struct {
@@ -51,7 +51,7 @@ func NewProjectRepository(db *gorm.DB) ProjectRepository {
 	}
 }
 
-func (r *projectRepository) CreateProject(ctx context.Context, name string) (*string, *string, error) {
+func (r *projectRepository) Create(ctx context.Context, name string) (*string, *string, error) {
 	ref := gonanoid.MustGenerate(string(lo.LowerCaseLettersCharset), 20)
 
 	object := &models.Object{
@@ -79,7 +79,7 @@ func (r *projectRepository) CreateProject(ctx context.Context, name string) (*st
 	return lo.ToPtr(project.ID), lo.ToPtr(ref), err
 }
 
-func (r *projectRepository) DeleteProjectByIDSoft(ctx context.Context, id string) error {
+func (r *projectRepository) DeleteByIDSoft(ctx context.Context, id string) error {
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("id = ?", id).Delete(&models.Project{}).Error; err != nil {
 			// 檢查是否因為找不到記錄而刪除失敗
@@ -114,7 +114,7 @@ func (r *projectRepository) DeleteProjectByIDSoft(ctx context.Context, id string
 	return nil
 }
 
-func (r *projectRepository) DeleteProjectByIDPermanently(ctx context.Context, id string) error {
+func (r *projectRepository) DeleteByIDPermanently(ctx context.Context, id string) error {
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Where("id = ?", id).Delete(&models.Project{}).Error; err != nil {
 			// 檢查是否因為找不到記錄而刪除失敗
@@ -149,7 +149,7 @@ func (r *projectRepository) DeleteProjectByIDPermanently(ctx context.Context, id
 	return nil
 }
 
-func (r *projectRepository) DeleteProjectByRefSoft(ctx context.Context, ref string) error {
+func (r *projectRepository) DeleteByRefSoft(ctx context.Context, ref string) error {
 	var project models.Project
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
@@ -188,7 +188,7 @@ func (r *projectRepository) DeleteProjectByRefSoft(ctx context.Context, ref stri
 	return nil
 }
 
-func (r *projectRepository) DeleteProjectByRefPermanently(ctx context.Context, ref string) error {
+func (r *projectRepository) DeleteByRefPermanently(ctx context.Context, ref string) error {
 	var project models.Project
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
@@ -227,7 +227,7 @@ func (r *projectRepository) DeleteProjectByRefPermanently(ctx context.Context, r
 	return nil
 }
 
-func (r *projectRepository) GetProjectByID(ctx context.Context, id string) (*models.Project, error) {
+func (r *projectRepository) GetByID(ctx context.Context, id string) (*models.Project, error) {
 	var project models.Project
 	if err := r.db.WithContext(ctx).Preload("Object").First(&project, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -241,7 +241,7 @@ func (r *projectRepository) GetProjectByID(ctx context.Context, id string) (*mod
 	return &project, nil
 }
 
-func (r *projectRepository) GetProjectByRef(ctx context.Context, ref string) (*models.Project, error) {
+func (r *projectRepository) GetByRef(ctx context.Context, ref string) (*models.Project, error) {
 	var project models.Project
 	if err := r.db.WithContext(ctx).Preload("Object").First(&project, "reference = ?", ref).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
