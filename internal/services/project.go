@@ -27,7 +27,7 @@ func NewProjectService(config *configs.Config, p repo.ProjectRepository, kp repo
 }
 
 func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error) {
-	id, ref, err := s.projectRepo.CreateProject(ctx, in.Body.Name)
+	id, ref, err := s.projectRepo.Create(ctx, in.Body.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	err = s.kubeProjectRepo.CreateCluster(ctx, s.namespace, *ref, in.Body.StorageSize)
 	if err != nil {
 		// Tey to clean up the cluster if creation fails
-		_ = s.projectRepo.DeleteProjectByIDPermanently(ctx, *id)
+		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
 
@@ -43,7 +43,7 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	if err != nil {
 		// Tey to clean up the cluster if database creation fails
 		_ = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, *ref)
-		_ = s.projectRepo.DeleteProjectByIDPermanently(ctx, *id)
+		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
 
@@ -52,7 +52,7 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		// Tey to clean up the cluster and database if ingress route creation fails
 		_ = s.kubeProjectRepo.DeleteDatabase(ctx, s.namespace, *ref)
 		_ = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, *ref)
-		_ = s.projectRepo.DeleteProjectByIDPermanently(ctx, *id)
+		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
 
@@ -75,7 +75,7 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		return nil, err
 	}
 
-	err = s.projectRepo.DeleteProjectByRefPermanently(ctx, in.Ref)
+	err = s.projectRepo.DeleteByRefPermanently(ctx, in.Ref)
 	if err != nil {
 		return nil, err
 	}

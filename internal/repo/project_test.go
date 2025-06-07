@@ -48,7 +48,7 @@ var (
 )
 
 func TestProjectRepository_ByID(t *testing.T) {
-	projectID, projectRef, err := repo.CreateProject(t.Context(), "Test Project")
+	projectID, projectRef, err := repo.Create(t.Context(), "Test Project")
 	if err != nil {
 		t.Fatalf("Failed to create project: %v", err)
 	}
@@ -56,24 +56,24 @@ func TestProjectRepository_ByID(t *testing.T) {
 	NewProejctRef = *projectRef
 	t.Logf("Created project with ID: %s", NewProjectID)
 
-	_, err = repo.GetProjectByID(t.Context(), NewProjectID)
+	_, err = repo.GetByID(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to get project by ID: %v", err)
 	}
 
-	err = repo.DeleteProjectByIDSoft(t.Context(), NewProjectID)
+	err = repo.DeleteByIDSoft(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to delete project: %v", err)
 	}
 
-	err = repo.DeleteProjectByIDPermanently(t.Context(), NewProjectID)
+	err = repo.DeleteByIDPermanently(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to permanently delete project: %v", err)
 	}
 }
 
 func TestProjectRepository_ByRef(t *testing.T) {
-	projectID, projectRef, err := repo.CreateProject(t.Context(), "Test Project")
+	projectID, projectRef, err := repo.Create(t.Context(), "Test Project")
 	if err != nil {
 		t.Fatalf("Failed to create project: %v", err)
 	}
@@ -81,17 +81,17 @@ func TestProjectRepository_ByRef(t *testing.T) {
 	NewProejctRef = *projectRef
 	t.Logf("Created project with ID: %s and Ref: %s", NewProjectID, NewProejctRef)
 
-	_, err = repo.GetProjectByRef(t.Context(), NewProejctRef)
+	_, err = repo.GetByRef(t.Context(), NewProejctRef)
 	if err != nil {
 		t.Fatalf("Failed to get project by Ref: %v", err)
 	}
 
-	err = repo.DeleteProjectByIDSoft(t.Context(), NewProjectID)
+	err = repo.DeleteByIDSoft(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to delete project: %v", err)
 	}
 
-	err = repo.DeleteProjectByIDPermanently(t.Context(), NewProjectID)
+	err = repo.DeleteByIDPermanently(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to permanently delete project: %v", err)
 	}
