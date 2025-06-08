@@ -46,7 +46,7 @@ func main() {
 	entityRepo := repo.NewEntityRepository(db, cache)
 	userRepo := repo.NewUserRepository(db, cache)
 	// Services
-	projectService := services.NewProjectService(config, projectRepo, kubeProjectRepo)
+	projectService := services.NewProjectService(config, entityRepo, projectRepo, kubeProjectRepo)
 	authService := services.NewAuthService(config, entityRepo, userRepo)
 
 	//////////// Init Controllers //////////

@@ -14,7 +14,7 @@ import (
 var ErrEntityNotFound = errors.New("entity not found")
 
 type EntityRepository interface {
-	GetEntityByChineseName(ctx context.Context, cname string) (*models.Entity, error)
+	GetByChineseName(ctx context.Context, cname string) (*models.Entity, error)
 }
 
 type entityRepository struct {
@@ -29,7 +29,7 @@ func NewEntityRepository(db *gorm.DB, cache *cache.Cache) EntityRepository {
 	}
 }
 
-func (r *entityRepository) GetEntityByChineseName(ctx context.Context, name string) (*models.Entity, error) {
+func (r *entityRepository) GetByChineseName(ctx context.Context, name string) (*models.Entity, error) {
 	// Check cache first
 	var entity models.Entity
 	if cachedEntity, found := r.cache.Get("entity" + name); found {
@@ -39,7 +39,7 @@ func (r *entityRepository) GetEntityByChineseName(ctx context.Context, name stri
 
 	// If not found in cache, query the database
 	if err := r.db.WithContext(ctx).Where("chinese_name = ?", name).First(&entity).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.WarnContext(ctx, "Entity not found in database", "chinese_name", name)
 			return nil, ErrEntityNotFound
 		}

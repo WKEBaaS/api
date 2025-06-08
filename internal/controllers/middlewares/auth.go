@@ -11,6 +11,11 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
+// NewAuthMiddleWare creates a middleware that checks if the user has the required roles
+// to access the API endpoint based on the JWT token provided in the Authorization header.
+//
+// Note: This function created middleware will update the user's info in the context with
+// the "UserID" key if the token is valid.
 func NewAuthMiddleWare(api huma.API, config *configs.Config, authSchema string) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		var anyOfNeededRoles []string
@@ -44,6 +49,15 @@ func NewAuthMiddleWare(api huma.API, config *configs.Config, authSchema string) 
 			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
+
+		// Update the context with the user ID from the JWT token
+		sub, ok := parsed.Subject()
+		if !ok || sub == "" {
+			slog.WarnContext(ctx.Context(), "JWT token does not contain a valid subject", "token", token)
+			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		ctx = huma.WithValue(ctx, "UserID", sub)
 
 		var roles []any
 		err = parsed.Get("baas_roles", &roles)

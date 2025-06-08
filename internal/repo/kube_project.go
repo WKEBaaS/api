@@ -225,7 +225,7 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 	ingressRouteTCPUnstructured.SetNamespace(namespace)
 
 	// set spec.routes[0]
-	projectHostSNI := fmt.Sprintf("HostSNI(`%s.%s`)", ref, &r.config.BaaS.Home.Host)
+	projectHostSNI := fmt.Sprintf("HostSNI(`%s.%s`)", ref, r.config.BaaS.Home.Host)
 	serviceName := fmt.Sprintf("%s-rw", ref)
 	unstructured.SetNestedSlice(ingressRouteTCPUnstructured.Object, []any{
 		map[string]any{

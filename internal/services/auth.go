@@ -30,15 +30,15 @@ type AuthService interface {
 }
 
 type authService struct {
-	entiryRepo repo.EntityRepository
+	entityRepo repo.EntityRepository
 	userRepo   repo.UserRepository
 	config     *configs.Config
 }
 
-func NewAuthService(config *configs.Config, entiryRepo repo.EntityRepository, userRepo repo.UserRepository) AuthService {
+func NewAuthService(config *configs.Config, ep repo.EntityRepository, up repo.UserRepository) AuthService {
 	return &authService{
-		entiryRepo: entiryRepo,
-		userRepo:   userRepo,
+		entityRepo: ep,
+		userRepo:   up,
 		config:     config,
 	}
 }
@@ -75,14 +75,14 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 		return nil, ErrFailedToParseIDTokenClaims
 	}
 
-	userID, exist, err := s.userRepo.GetUserIDByProviderAndID(ctx, "keycloak", idToken.Subject)
+	userID, exist, err := s.userRepo.GetIDByProviderAndID(ctx, "keycloak", idToken.Subject)
 	if err != nil {
 		return nil, err
 	}
 
 	// If user does not exist, create a new user
 	if !exist {
-		userEntityID, err := s.entiryRepo.GetEntityByChineseName(ctx, "使用者")
+		userEntity, err := s.entityRepo.GetByChineseName(ctx, "使用者")
 		if err != nil {
 			return nil, err
 		}
@@ -92,8 +92,8 @@ func (s *authService) AuthCallback(ctx context.Context, in *dto.AuthCallbackInpu
 			identityData = datatypes.JSON(fmt.Appendf(nil, `{"email":"%s"}`, *idTokenClaims.Email))
 		}
 
-		id, err := s.userRepo.CreateUserFromIdentity(ctx, &repo.CreateUserFromIdentityInput{
-			UserEntityID: userEntityID.ID,
+		id, err := s.userRepo.CreateFromIdentity(ctx, &repo.CreateUserFromIdentityInput{
+			UserEntityID: userEntity.ID,
 			Name:         idTokenClaims.DisplayName,
 			Email:        idTokenClaims.Email,
 			Username:     idTokenClaims.Username,

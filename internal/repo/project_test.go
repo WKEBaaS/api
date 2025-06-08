@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/patrickmn/go-cache"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -13,9 +15,10 @@ import (
 )
 
 var (
-	db   *gorm.DB
-	err  error
-	repo ProjectRepository
+	db  *gorm.DB
+	err error
+	pp  ProjectRepository
+	ep  EntityRepository
 )
 
 func TestMain(m *testing.M) {
@@ -37,7 +40,10 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	repo = NewProjectRepository(db)
+	cache := cache.New(15*time.Minute, 20*time.Minute)
+
+	pp = NewProjectRepository(db)
+	ep = NewEntityRepository(db, cache)
 
 	os.Exit(m.Run())
 }
@@ -48,7 +54,12 @@ var (
 )
 
 func TestProjectRepository_ByID(t *testing.T) {
-	projectID, projectRef, err := repo.Create(t.Context(), "Test Project")
+	projectEntity, err := ep.GetByChineseName(t.Context(), "專案")
+	if err != nil {
+		t.Fatalf("Failed to get project entity: %v", err)
+	}
+
+	projectID, projectRef, err := pp.Create(t.Context(), "Test Project", nil, projectEntity.ID, nil)
 	if err != nil {
 		t.Fatalf("Failed to create project: %v", err)
 	}
@@ -56,24 +67,29 @@ func TestProjectRepository_ByID(t *testing.T) {
 	NewProejctRef = *projectRef
 	t.Logf("Created project with ID: %s", NewProjectID)
 
-	_, err = repo.GetByID(t.Context(), NewProjectID)
+	_, err = pp.FindByID(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to get project by ID: %v", err)
 	}
 
-	err = repo.DeleteByIDSoft(t.Context(), NewProjectID)
+	err = pp.DeleteByIDSoft(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to delete project: %v", err)
 	}
 
-	err = repo.DeleteByIDPermanently(t.Context(), NewProjectID)
+	err = pp.DeleteByIDPermanently(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to permanently delete project: %v", err)
 	}
 }
 
 func TestProjectRepository_ByRef(t *testing.T) {
-	projectID, projectRef, err := repo.Create(t.Context(), "Test Project")
+	projectEntity, err := ep.GetByChineseName(t.Context(), "專案")
+	if err != nil {
+		t.Fatalf("Failed to get project entity: %v", err)
+	}
+
+	projectID, projectRef, err := pp.Create(t.Context(), "Test Project", nil, projectEntity.ID, nil)
 	if err != nil {
 		t.Fatalf("Failed to create project: %v", err)
 	}
@@ -81,17 +97,17 @@ func TestProjectRepository_ByRef(t *testing.T) {
 	NewProejctRef = *projectRef
 	t.Logf("Created project with ID: %s and Ref: %s", NewProjectID, NewProejctRef)
 
-	_, err = repo.GetByRef(t.Context(), NewProejctRef)
+	_, err = pp.FindByRef(t.Context(), NewProejctRef)
 	if err != nil {
 		t.Fatalf("Failed to get project by Ref: %v", err)
 	}
 
-	err = repo.DeleteByIDSoft(t.Context(), NewProjectID)
+	err = pp.DeleteByIDSoft(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to delete project: %v", err)
 	}
 
-	err = repo.DeleteByIDPermanently(t.Context(), NewProjectID)
+	err = pp.DeleteByIDPermanently(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to permanently delete project: %v", err)
 	}

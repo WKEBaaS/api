@@ -13,20 +13,21 @@ import (
 )
 
 var (
-	ErrProjectNotFound     = errors.New("project not found")
-	ErrCreateProjectFailed = errors.New("failed to create project")
-	ErrDeleteProjectFailed = errors.New("failed to delete project")
+	ErrProjectNotFound         = errors.New("project not found")
+	ErrCreateProjectFailed     = errors.New("failed to create project")
+	ErrFindUsersProjectsFailed = errors.New("failed to find user's projects")
 )
 
 type ProjectRepository interface {
-	// Crete
+	// Create
 	//
 	// params:
 	// 	@param name project name
-	// 	@param ref  must contain exactly 20 alphabetic characters [a-zA-Z]
+	// 	@param description project description (optional)
+	// 	@param entityID project entity id
 	//
 	// @return id, ref of the created project
-	Create(ctx context.Context, name string) (*string, *string, error)
+	Create(ctx context.Context, name string, description *string, entityID string, userID *string) (*string, *string, error)
 	// DeleteByIDSoft 依 ID 軟刪除專案 (及其關聯的 Object)。
 	DeleteByIDSoft(ctx context.Context, id string) error
 	// DeleteByIDPermanently 依 ID 永久刪除專案 (及其關聯的 Object)。
@@ -35,10 +36,12 @@ type ProjectRepository interface {
 	DeleteByRefSoft(ctx context.Context, ref string) error
 	// DeleteByRefPermanently 依 Reference 永久刪除專案 (及其關聯的 Object)。
 	DeleteByRefPermanently(ctx context.Context, ref string) error
-	// GetByID 依 ID 取得專案詳細資訊 (包含關聯的 Object)。
-	GetByID(ctx context.Context, id string) (*models.Project, error)
-	// GetByRef 依 Reference 取得專案詳細資訊 (包含關聯的 Object)。
-	GetByRef(ctx context.Context, ref string) (*models.Project, error)
+	// FindByID 依 ID 取得專案詳細資訊 (包含關聯的 Object)。
+	FindByID(ctx context.Context, id string) (*models.ProjectView, error)
+	// FindByRef 依 Reference 取得專案詳細資訊 (包含關聯的 Object)。
+	FindByRef(ctx context.Context, ref string) (*models.ProjectView, error)
+	// FindAllByUserID 依使用者 ID 取得所有專案 (包含關聯的 Object)。
+	FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error)
 }
 
 type projectRepository struct {
@@ -51,11 +54,14 @@ func NewProjectRepository(db *gorm.DB) ProjectRepository {
 	}
 }
 
-func (r *projectRepository) Create(ctx context.Context, name string) (*string, *string, error) {
+func (r *projectRepository) Create(ctx context.Context, name string, description *string, entityID string, userID *string) (*string, *string, error) {
 	ref := gonanoid.MustGenerate(string(lo.LowerCaseLettersCharset), 20)
 
 	object := &models.Object{
-		ChineseName: lo.ToPtr(name),
+		ChineseName:        lo.ToPtr(name),
+		ChineseDescription: description,
+		EntityID:           &entityID,
+		OwnerID:            userID,
 	}
 
 	project := &models.Project{
@@ -227,9 +233,9 @@ func (r *projectRepository) DeleteByRefPermanently(ctx context.Context, ref stri
 	return nil
 }
 
-func (r *projectRepository) GetByID(ctx context.Context, id string) (*models.Project, error) {
-	var project models.Project
-	if err := r.db.WithContext(ctx).Preload("Object").First(&project, "id = ?", id).Error; err != nil {
+func (r *projectRepository) FindByID(ctx context.Context, id string) (*models.ProjectView, error) {
+	var project models.ProjectView
+	if err := r.db.WithContext(ctx).First(&project, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.WarnContext(ctx, "Project not found by ID", "projectID", id)
 			return nil, ErrProjectNotFound
@@ -241,9 +247,9 @@ func (r *projectRepository) GetByID(ctx context.Context, id string) (*models.Pro
 	return &project, nil
 }
 
-func (r *projectRepository) GetByRef(ctx context.Context, ref string) (*models.Project, error) {
-	var project models.Project
-	if err := r.db.WithContext(ctx).Preload("Object").First(&project, "reference = ?", ref).Error; err != nil {
+func (r *projectRepository) FindByRef(ctx context.Context, ref string) (*models.ProjectView, error) {
+	var project models.ProjectView
+	if err := r.db.WithContext(ctx).First(&project, "reference = ?", ref).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.WarnContext(ctx, "Project not found by reference", "projectRef", ref)
 			return nil, ErrProjectNotFound
@@ -253,4 +259,19 @@ func (r *projectRepository) GetByRef(ctx context.Context, ref string) (*models.P
 	}
 	slog.InfoContext(ctx, "Project retrieved successfully by reference", "projectRef", ref, "projectID", project.ID)
 	return &project, nil
+}
+
+func (r *projectRepository) FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error) {
+	var projects []*models.ProjectView
+	if err := r.db.WithContext(ctx).
+		Where("owner_id = ?", userID).
+		Find(&projects).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.WarnContext(ctx, "No projects found for user", "userID", userID)
+			return nil, nil // No projects found, return empty slice
+		}
+		slog.ErrorContext(ctx, "Failed to get projects by user ID", "userID", userID, "error", err)
+		return nil, ErrFindUsersProjectsFailed
+	}
+	return projects, nil
 }

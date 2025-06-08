@@ -13,9 +13,8 @@ import (
 )
 
 var (
-	ErrCreateUserFailed                  = errors.New("failed to create user")
-	ErrFailedToCheckUserExistsByProvider = errors.New("failed to check if user exists by provider and ID")
-	ErrFailedToGetUserIDByProvider       = errors.New("failed to get user ID by provider and ID")
+	ErrCreateUserFailed            = errors.New("failed to create user")
+	ErrFailedToGetUserIDByProvider = errors.New("failed to get user ID by provider and ID")
 )
 
 type CreateUserFromIdentityInput struct {
@@ -32,15 +31,15 @@ type CreateUserFromIdentityInput struct {
 }
 
 type UserRepository interface {
-	// CreateUserFromIdentity creates a user from an identity provider.
+	// CreateFromIdentity creates a user from an identity provider.
 	//
 	// Returns the user ID if successful, or an error if the operation fails.
-	CreateUserFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error)
-	// GetUserIDByProviderAndID 透過 provider 和 providerID 取得使用者 ID
+	CreateFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error)
+	// GetIDByProviderAndID 透過 provider 和 providerID 取得使用者 ID
 	// 如果找到，則回傳使用者 ID 和 true
 	// 如果找不到，則回傳 0 和 false (假設 UserID 是 uint)
 	// 如果發生其他錯誤，則回傳 0 和錯誤
-	GetUserIDByProviderAndID(ctx context.Context, provider, providerID string) (*string, bool, error)
+	GetIDByProviderAndID(ctx context.Context, provider, providerID string) (*string, bool, error)
 }
 
 type userRepository struct {
@@ -55,7 +54,7 @@ func NewUserRepository(db *gorm.DB, cache *cache.Cache) UserRepository {
 	}
 }
 
-func (r *userRepository) CreateUserFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error) {
+func (r *userRepository) CreateFromIdentity(ctx context.Context, in *CreateUserFromIdentityInput) (*string, error) {
 	object := &models.Object{
 		EntityID:    &in.UserEntityID,
 		ChineseName: &in.Name,
@@ -98,7 +97,7 @@ func (r *userRepository) CreateUserFromIdentity(ctx context.Context, in *CreateU
 	return &user.ID, err
 }
 
-func (r *userRepository) GetUserIDByProviderAndID(ctx context.Context, provider, providerID string) (*string, bool, error) {
+func (r *userRepository) GetIDByProviderAndID(ctx context.Context, provider, providerID string) (*string, bool, error) {
 	// 嘗試從快取中取得 UserID
 	cacheKey := "userid:" + provider + ":" + providerID
 	if cachedUserID, found := r.cache.Get(cacheKey); found {
