@@ -6,6 +6,7 @@ import (
 	"baas-api/internal/models"
 	"baas-api/internal/repo"
 	"context"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -15,6 +16,7 @@ type ProjectService interface {
 	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
+	ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error)
 }
 
 type projectService struct {
@@ -46,14 +48,14 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	err = s.kubeProjectRepo.CreateCluster(ctx, s.namespace, *ref, in.Body.StorageSize)
 	if err != nil {
-		// Tey to clean up the cluster if creation fails
+		// Try to clean up the cluster if creation fails
 		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
 
 	err = s.kubeProjectRepo.CreateDatabase(ctx, s.namespace, *ref)
 	if err != nil {
-		// Tey to clean up the cluster if database creation fails
+		// Try to clean up the cluster if database creation fails
 		_ = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, *ref)
 		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
@@ -61,22 +63,24 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	err = s.kubeProjectRepo.CreateIngressRouteTCP(ctx, s.namespace, *ref)
 	if err != nil {
-		// Tey to clean up the cluster and database if ingress route creation fails
+		// Try to clean up the cluster and database if ingress route creation fails
 		_ = s.kubeProjectRepo.DeleteDatabase(ctx, s.namespace, *ref)
 		_ = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, *ref)
 		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
 
+	time.Sleep(time.Millisecond * 50)
+
 	out := &dto.CreateProjectOutput{}
 	out.Body.ID = *id
-	out.Body.Ref = *ref
+	out.Body.Reference = *ref
 
 	return out, nil
 }
 
 func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
-	project, err := s.projectRepo.FindByRef(ctx, in.Ref)
+	project, err := s.projectRepo.FindByRef(ctx, in.Reference)
 	if err != nil {
 		return nil, err
 	}
@@ -84,23 +88,23 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		return nil, huma.Error401Unauthorized("Unauthorized")
 	}
 
-	err = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, in.Ref)
+	err = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, in.Reference)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.kubeProjectRepo.DeleteDatabase(ctx, s.namespace, in.Ref)
+	err = s.kubeProjectRepo.DeleteDatabase(ctx, s.namespace, in.Reference)
 	if err != nil {
 		// If the database deletion fails, we should not proceed with deleting the project entry
 		return nil, err
 	}
 
-	err = s.projectRepo.DeleteByRefPermanently(ctx, in.Ref)
+	err = s.projectRepo.DeleteByRefPermanently(ctx, in.Reference)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.kubeProjectRepo.DeleteIngressRouteTCP(ctx, s.namespace, in.Ref)
+	err = s.kubeProjectRepo.DeleteIngressRouteTCP(ctx, s.namespace, in.Reference)
 	if err != nil {
 		return nil, err
 	}
@@ -131,4 +135,14 @@ func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID st
 	}
 
 	return project, nil
+}
+
+func (s *projectService) ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error) {
+	err := s.kubeProjectRepo.ResetDatabasePassword(ctx, s.namespace, in.Body.Reference, in.Body.Password)
+	if err != nil {
+		return nil, err
+	}
+	out := &dto.ResetDatabasePasswordOutput{}
+	out.Body.Success = true
+	return out, nil
 }

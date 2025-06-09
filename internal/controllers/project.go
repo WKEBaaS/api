@@ -16,6 +16,7 @@ type ProjectController interface {
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
 	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error)
 	getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error)
+	resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error)
 }
 
 type projectController struct {
@@ -71,7 +72,7 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Security: []map[string][]string{
 			{"baasAuth": {"project:manage", "project:create"}},
 		},
-		Middlewares: huma.Middlewares{authMiddleware},
+		Middlewares: huma.Middlewares{authMiddleware, middlewares.TLSMiddleware},
 	}, c.createProject)
 
 	huma.Register(api, huma.Operation{
@@ -99,6 +100,19 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.getUsersProjects)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "reset-database-password",
+		Method:      "POST",
+		Path:        "/project/reset-database-password",
+		Summary:     "Reset Database Password",
+		Description: "Reset the database password for a project. The reference is a 20-character string.",
+		Tags:        []string{"Project"},
+		Security: []map[string][]string{
+			{"baasAuth": {"project:manage", "project:write"}},
+		},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.resetDatabasePassword)
 }
 
 func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error) {
@@ -154,6 +168,20 @@ func (c *projectController) getUsersProjects(ctx context.Context, in *dto.GetUse
 
 	out := &dto.GetUsersProjectsOutput{}
 	out.Body.Projects = projects
+
+	return out, nil
+}
+
+func (c *projectController) resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := c.projectService.ResetDatabasePassword(ctx, in, *userID)
+	if err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }

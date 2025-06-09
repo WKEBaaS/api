@@ -35,6 +35,8 @@ var (
 	ErrFailedToSetSpecClusterName         = errors.New("failed to set cluster name in Postgres database spec")
 	ErrFeiledToCreatePostgresDatabase     = errors.New("failed to create Postgres database")
 	ErrFailedToDeletePostgresDatabase     = errors.New("failed to delete Postgres database")
+	ErrFailedToReadDatabaseSecret         = errors.New("failed to read Postgres database secret")
+	ErrFailedToResetDatabasePassword      = errors.New("failed to reset Postgres database password")
 	// ingress route TCP errors
 	ErrFailedToOpenIngressRouteTCPYAML    = errors.New("failed to open IngressRouteTCP YAML file")
 	ErrFailedToDecodeIngressRouteTCPYAML  = errors.New("failed to decode IngressRouteTCP YAML")
@@ -51,6 +53,8 @@ type KubeProjectRepository interface {
 
 	CreateDatabase(ctx context.Context, namespace string, ref string) error
 	DeleteDatabase(ctx context.Context, namespace string, ref string) error
+	ReadDatabasePassword(ctx context.Context, namespace string, ref string) (*string, error)
+	ResetDatabasePassword(ctx context.Context, namespace string, ref string, password string) error
 
 	CreateIngressRouteTCP(ctx context.Context, namespace string, ref string) error
 	DeleteIngressRouteTCP(ctx context.Context, namespace string, ref string) error
@@ -200,6 +204,43 @@ func (r *kubeProjectRepository) DeleteDatabase(ctx context.Context, namespace st
 	if err != nil {
 		slog.Error("Failed to delete Postgres database", "error", err)
 		return ErrFailedToDeletePostgresDatabase
+	}
+
+	return nil
+}
+
+func (r *kubeProjectRepository) ReadDatabasePassword(ctx context.Context, namespace string, ref string) (*string, error) {
+	secretName := fmt.Sprintf("%s-app", ref)
+	secret, err := r.clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("Failed to read database secret", "error", err)
+		return nil, ErrFailedToReadDatabaseSecret
+	}
+
+	passwordBytes, ok := secret.Data["password"]
+	if !ok {
+		slog.Error("Password not found in database secret", "secretName", secretName)
+		return nil, ErrFailedToReadDatabaseSecret
+	}
+
+	password := string(passwordBytes)
+	return &password, nil
+}
+
+func (r *kubeProjectRepository) ResetDatabasePassword(ctx context.Context, namespace, ref, password string) error {
+	secretName := fmt.Sprintf("%s-app", ref)
+	secret, err := r.clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("Failed to read database secret", "error", err)
+		return ErrFailedToReadDatabaseSecret
+	}
+
+	// Update the secret with the new password
+	secret.Data["password"] = []byte(password)
+	_, err = r.clientset.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
+	if err != nil {
+		slog.Error("Failed to update database secret with new password", "error", err)
+		return ErrFailedToResetDatabasePassword
 	}
 
 	return nil
