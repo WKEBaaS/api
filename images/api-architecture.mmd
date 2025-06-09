@@ -1,0 +1,90 @@
+graph TD
+    %% External Entry
+    User_Request["外部請求 (例如 HTTP)"]
+
+    %% Application Entry & Configuration
+    subgraph "應用程式進入點 (cmd)"
+        direction LR
+        Cmd["cmd/main.go"]
+        Configs["configs"]
+        Cmd -->|載入| Configs
+    end
+
+    %% Routing
+    subgraph "路由層 (router)"
+        Router["router"]
+    end
+
+    %% Controllers & Request/Response Handling
+    subgraph "控制器層 (controllers)"
+        direction LR
+        Controller["controllers"]
+    end
+
+    %% Shared Data Transfer Objects
+    subgraph "資料傳輸物件 (dto)"
+        DTO["dto(請求/回應結構)"]
+    end
+
+    %% Business Logic
+    subgraph "服務層 (services)"
+        Service["services"]
+    end
+
+    %% Data Access & Domain
+    subgraph "Repo (Repository)"
+        direction LR
+        Repository["repo"]
+        Models["models(資料庫ORM)"]
+        DataSource["(資料庫/外部API)"]
+        Repository -->|使用| Models
+        Repository -->|存取| DataSource
+    end
+
+    %% Infrastructure Services (e.g., DB migrations)
+    subgraph "基礎設施服務 (i3s)"
+        direction LR
+        I3S["i3s"]
+        Migrations["i3s/migrations"]
+        I3S -->|例如管理| DataSource
+        Migrations -->|執行遷移於| DataSource
+    end
+
+    %% Flow & Dependencies
+    User_Request --> Router
+    Cmd -->|初始化並啟動| Router
+    Cmd -->|初始化| Controller
+    Cmd -->|初始化| Service
+    Cmd -->|初始化| Repository
+    Cmd -->|可能執行| Migrations
+
+
+    Router -->|將請求路由至| Controller
+
+    Controller -->|使用| DTO
+    Controller -->|呼叫業務邏輯| Service
+
+    Service -->|可能使用| DTO
+    Service -->|呼叫資料存取| Repository
+
+
+    %% Styling
+    classDef entry fill:#D5E8D4,stroke:#82B366,stroke-width:2px;
+    classDef presentation fill:#DAE8FC,stroke:#6C8EBF,stroke-width:2px;
+    classDef business fill:#FFF2CC,stroke:#D6B656,stroke-width:2px;
+    classDef data fill:#F8CECC,stroke:#B85450,stroke-width:2px;
+    classDef shared fill:#E1D5E7,stroke:#9673A6,stroke-width:2px;
+    classDef infra fill:#FFE6CC,stroke:#D79B00,stroke-width:2px;
+
+    class User_Request entry;
+    class Cmd entry;
+    class Configs shared;
+    class Router presentation;
+    class Controller presentation;
+    class DTO shared;
+    class Service business;
+    class Repository data;
+    class Models data;
+    class DataSource data;
+    class I3S infra;
+    class Migrations infra;
