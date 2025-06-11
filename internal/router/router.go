@@ -50,7 +50,9 @@ func NewApiCli(appConfig *configs.Config, controllers ...any) humacli.CLI {
 		}
 
 		hooks.OnStart(func() {
-			app.Listen(fmt.Sprintf(":%d", options.Port))
+			if err := app.Listen(fmt.Sprintf(":%d", options.Port)); err != nil {
+				slog.Error("Failed to start server", "error", err)
+			}
 		})
 	})
 
