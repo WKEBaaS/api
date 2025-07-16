@@ -6,8 +6,11 @@ import (
 	"baas-api/internal/dto"
 	"baas-api/internal/services"
 	"context"
+	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/sse"
 )
 
 type ProjectController interface {
@@ -34,19 +37,22 @@ func NewProjectController(config *configs.Config, projectService services.Projec
 func (c *projectController) RegisterProjectAPIs(api huma.API) {
 	authMiddleware := middlewares.NewAuthMiddleWare(api, c.config, "baasAuth")
 
-	huma.Register(api, huma.Operation{
+	type MessageEvent struct {
+		Content string `json:"content"`
+	}
+	sse.Register(api, huma.Operation{
 		OperationID: "test",
-		Method:      "GET",
+		Method:      http.MethodGet,
 		Path:        "/test",
 		Summary:     "Test Endpoint",
-		Description: "A simple test endpoint to verify the API is working.",
 		Tags:        []string{"Test"},
-		Security: []map[string][]string{
-			{"baasAuth": {"project:manage"}},
-		},
-		Middlewares: huma.Middlewares{authMiddleware},
-	}, func(ctx context.Context, in *struct{}) (*struct{}, error) {
-		return nil, nil
+	}, map[string]any{
+		"message": MessageEvent{},
+	}, func(ctx context.Context, in *struct{}, send sse.Sender) {
+		for range 3 {
+			send.Data(MessageEvent{Content: "Hello, World!"})
+			time.Sleep(1 * time.Second)
+		}
 	})
 
 	huma.Register(api, huma.Operation{

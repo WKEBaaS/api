@@ -4,12 +4,13 @@ import (
 	"baas-api/internal/configs"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humafiber"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/danielgtaylor/huma/v2/humacli"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Options struct {
@@ -17,7 +18,7 @@ type Options struct {
 	Debug bool `help:"Enable debug mode" short:"d" default:"false"`
 }
 
-func NewApiCli(appConfig *configs.Config, controllers ...any) humacli.CLI {
+func NewAPICli(appConfig *configs.Config, controllers ...any) humacli.CLI {
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
 		slog.Info("Option.Debug", "debug", options.Debug)
 		if options.Debug {
@@ -35,13 +36,12 @@ func NewApiCli(appConfig *configs.Config, controllers ...any) humacli.CLI {
 
 		huma.NewError = NewCustomError
 
-		app := fiber.New()
-		app.Use(logger.New(logger.Config{
-			Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
-		}))
+		// app := fiber.New()
+		router := chi.NewMux()
+		router.Use(middleware.Logger)
 
 		////////// Register APIs //////////
-		api := humafiber.New(app, humaConfig)
+		api := humachi.New(router, humaConfig)
 		v1Api := huma.NewGroup(api, "/v1")
 
 		// Register controllers
@@ -50,7 +50,9 @@ func NewApiCli(appConfig *configs.Config, controllers ...any) humacli.CLI {
 		}
 
 		hooks.OnStart(func() {
-			if err := app.Listen(fmt.Sprintf(":%d", options.Port)); err != nil {
+			slog.Info("Starting server", "port", options.Port)
+			err := http.ListenAndServe(fmt.Sprintf(":%d", options.Port), router)
+			if err != nil {
 				slog.Error("Failed to start server", "error", err)
 			}
 		})

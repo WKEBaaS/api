@@ -53,7 +53,7 @@ func main() {
 	authController := controllers.NewAuthController(config, authService)
 	projectController := controllers.NewProjectController(config, projectService)
 
-	cli := router.NewApiCli(config, authController, projectController)
+	cli := router.NewAPICli(config, authController, projectController)
 
 	cli.Run()
 }
