@@ -1,0 +1,30 @@
+# Top-level application configuration.
+app:
+  # The port on which the application server will listen.
+  port: "8080"
+  # The host address for the application server.
+  host: "0.0.0.0"
+  # The external domain name for the application. Used for generating external URLs.
+  externalDomain: "app.example.com"
+  # A boolean to indicate if the external domain uses HTTPS.
+  externalSecure: true
+
+# Auth service configuration.
+auth:
+  url: "https://auth.example.com"
+
+# Database connection configuration.
+database:
+  # The full connection URL for the database (e.g., PostgreSQL, MySQL).
+  url: "postgres://user:password@db.example.com:5432/my-app-db?sslmode=disable"
+
+# Kubernetes-specific configuration.
+kube:
+  # Path to the Kubernetes configuration file. Leave empty to use in-cluster config.
+  configPath: ""
+  # Project-specific Kubernetes settings.
+  project:
+    # The Kubernetes namespace where the application is running.
+    namespace: "default"
+    # The name of the Kubernetes secret containing TLS certificates.
+    tlsSecretName: "app-tls-secret"

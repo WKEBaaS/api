@@ -30,12 +30,12 @@ type ProjectRepository interface {
 	Create(ctx context.Context, name string, description *string, entityID string, userID *string) (*string, *string, error)
 	// DeleteByIDSoft 依 ID 軟刪除專案 (及其關聯的 Object)。
 	DeleteByIDSoft(ctx context.Context, id string) error
-	// DeleteByIDPermanently 依 ID 永久刪除專案 (及其關聯的 Object)。
-	DeleteByIDPermanently(ctx context.Context, id string) error
+	// DeleteByID 依 ID 永久刪除專案 (及其關聯的 Object)。
+	DeleteByID(ctx context.Context, id string) error
 	// DeleteByRefSoft 依 Reference 軟刪除專案 (及其關聯的 Object)。
 	DeleteByRefSoft(ctx context.Context, ref string) error
-	// DeleteByRefPermanently 依 Reference 永久刪除專案 (及其關聯的 Object)。
-	DeleteByRefPermanently(ctx context.Context, ref string) error
+	// DeleteByRef 依 Reference 永久刪除專案 (及其關聯的 Object)。
+	DeleteByRef(ctx context.Context, ref string) error
 	// FindByID 依 ID 取得專案詳細資訊 (包含關聯的 Object)。
 	FindByID(ctx context.Context, id string) (*models.ProjectView, error)
 	// FindByRef 依 Reference 取得專案詳細資訊 (包含關聯的 Object)。
@@ -120,7 +120,7 @@ func (r *projectRepository) DeleteByIDSoft(ctx context.Context, id string) error
 	return nil
 }
 
-func (r *projectRepository) DeleteByIDPermanently(ctx context.Context, id string) error {
+func (r *projectRepository) DeleteByID(ctx context.Context, id string) error {
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Where("id = ?", id).Delete(&models.Project{}).Error; err != nil {
 			// 檢查是否因為找不到記錄而刪除失敗
@@ -194,7 +194,7 @@ func (r *projectRepository) DeleteByRefSoft(ctx context.Context, ref string) err
 	return nil
 }
 
-func (r *projectRepository) DeleteByRefPermanently(ctx context.Context, ref string) error {
+func (r *projectRepository) DeleteByRef(ctx context.Context, ref string) error {
 	var project models.Project
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).

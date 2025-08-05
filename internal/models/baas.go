@@ -1,8 +1,13 @@
+// Package models
 package models
 
 import (
 	"errors"
 	"regexp"
+	"time"
+
+	"github.com/lib/pq"
+	"gorm.io/datatypes"
 )
 
 var ErrInvalidReference = errors.New("invalid reference format, must be exactly 20 lower alphabetic characters [a-z]")
@@ -11,8 +16,9 @@ var refRegex = regexp.MustCompile(`^[a-z]{20}$`)
 
 // Project 對應 dbo.projects 資料表
 type Project struct {
-	ID        string `gorm:"type:varchar(21);primaryKey;unique"` // VARCHAR(21) NOT NULL UNIQUE, 同時是主鍵
-	Reference string `gorm:"type:varchar(20);not null;unique"`   // VARCHAR(20) NOT NULL UNIQUE, 也是外鍵
+	ID              string `gorm:"type:varchar(21);primaryKey;unique"` // VARCHAR(21) NOT NULL UNIQUE, 同時是主鍵
+	Reference       string `gorm:"type:varchar(20);not null;unique"`   // VARCHAR(20) NOT NULL UNIQUE, 也是外鍵
+	PasswordExpired bool   `gorm:"type:bit;not null;default:false"`    // BIT NOT NULL DEFAULT 0, 密碼是否過期
 
 	// gorm one-to-one
 	Object Object `gorm:"foreignKey:ID;references:ID"`
@@ -22,11 +28,45 @@ func (Project) TableName() string {
 	return "dbo.projects"
 }
 
+type ProjectAuthSettings struct {
+	ID                      string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	ProjectID               string         `gorm:"type:uuid;not null;unique" json:"project_id"`
+	Secret                  string         `gorm:"type:text;not null;default:encode(gen_random_bytes(32), 'base64')" json:"secret"`
+	TrustedOrigins          pq.StringArray `gorm:"type:text[];not null;default:'{}'" json:"trusted_origins"`
+	EmailAndPasswordEnabled bool           `gorm:"not null;default:true" json:"email_and_password_enabled"`
+	CreatedAt               time.Time      `gorm:"not null;default:now()" json:"created_at"`
+	UpdatedAt               time.Time      `gorm:"not null;default:now()" json:"updated_at"`
+}
+
+// TableName specifies the table name for ProjectAuthSettings
+func (ProjectAuthSettings) TableName() string {
+	return "dbo.project_auth_settings"
+}
+
+// ProjectOAuthProvider represents the project_oauth_providers table
+type ProjectOAuthProvider struct {
+	ID           string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	Enabled      bool           `gorm:"not null;default:false" json:"enabled"`
+	Name         string         `gorm:"type:varchar(50);not null" json:"name"`
+	ProjectID    string         `gorm:"type:uuid;not null" json:"project_id"`
+	CreatedAt    time.Time      `gorm:"not null;default:current_timestamp" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"not null;default:current_timestamp" json:"updated_at"`
+	ClientID     string         `gorm:"type:text;not null" json:"client_id"`
+	ClientSecret string         `gorm:"type:text;not null" json:"client_secret"`
+	ExtraConfig  datatypes.JSON `gorm:"type:jsonb" json:"extra_config"`
+}
+
+// TableName specifies the table name for ProjectOAuthProvider
+func (ProjectOAuthProvider) TableName() string {
+	return "dbo.project_oauth_providers"
+}
+
 func IsValidReference(ref string) bool {
 	return refRegex.MatchString(ref)
 }
 
 // Views
+
 type ProjectView struct {
 	ID          string  `gorm:"type:varchar(21);primaryKey;unique" json:"id"`
 	Name        string  `gorm:"type:varchar(255);not null" json:"name"`

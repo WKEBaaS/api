@@ -1,7 +1,10 @@
+// Package router
+//
+// BaaS API Router
 package router
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,11 +17,10 @@ import (
 )
 
 type Options struct {
-	Port  int  `help:"Port to listen on" short:"p" default:"8888"`
 	Debug bool `help:"Enable debug mode" short:"d" default:"false"`
 }
 
-func NewAPICli(appConfig *configs.Config, controllers ...any) humacli.CLI {
+func NewAPICli(appConfig *config.Config, controllers ...any) humacli.CLI {
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
 		slog.Info("Option.Debug", "debug", options.Debug)
 		if options.Debug {
@@ -26,13 +28,6 @@ func NewAPICli(appConfig *configs.Config, controllers ...any) humacli.CLI {
 		}
 
 		humaConfig := huma.DefaultConfig("WKE BaaS API", "0.1.0")
-		humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-			"baasAuth": {
-				Type:         "http",
-				Scheme:       "bearer",
-				BearerFormat: "JWT",
-			},
-		}
 
 		huma.NewError = NewCustomError
 
@@ -50,8 +45,8 @@ func NewAPICli(appConfig *configs.Config, controllers ...any) humacli.CLI {
 		}
 
 		hooks.OnStart(func() {
-			slog.Info("Starting server", "port", options.Port)
-			err := http.ListenAndServe(fmt.Sprintf(":%d", options.Port), router)
+			slog.Info("Starting server", "host", appConfig.App.Host, "port", appConfig.App.Port)
+			err := http.ListenAndServe(fmt.Sprintf("%s:%s", appConfig.App.Host, appConfig.App.Port), router)
 			if err != nil {
 				slog.Error("Failed to start server", "error", err)
 			}

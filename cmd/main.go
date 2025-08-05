@@ -1,15 +1,19 @@
 package main
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
 	"baas-api/internal/controllers"
 	"baas-api/internal/i3s"
 	"baas-api/internal/repo"
+	"baas-api/internal/repo/kube"
 	"baas-api/internal/router"
 	"baas-api/internal/services"
 	"log"
 	"time"
 
+	// "time"
+	//
+	// "github.com/patrickmn/go-cache"
 	"github.com/patrickmn/go-cache"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -17,10 +21,13 @@ import (
 )
 
 func main() {
-	config := configs.LoadConfig()
+	config, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load config: %v\n", err)
+	}
 
 	//////////// Init Gorm Database //////////
-	db, err := gorm.Open(postgres.Open(config.DatabaseURL), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: false,
 			NoLowerCase:   false,
@@ -39,21 +46,22 @@ func main() {
 	//////////// Init Cache //////////
 	cache := cache.New(15*time.Minute, 20*time.Minute)
 
-	//////////// Init Repo, Service //////////
+	// //////////// Init Repo, Service //////////
 	// Repositories
 	projectRepo := repo.NewProjectRepository(db)
-	kubeProjectRepo := repo.NewKubeProjectRepository(config)
+	projectAuthSettingRepo := repo.NewProjectAuthSettingRepository(db)
+	kubeProjectRepo := kube.NewKubeProjectRepository(config)
 	entityRepo := repo.NewEntityRepository(db, cache)
-	userRepo := repo.NewUserRepository(db, cache)
+	// userRepo := repo.NewUserRepository(db, cache)
 	// Services
-	projectService := services.NewProjectService(config, entityRepo, projectRepo, kubeProjectRepo)
-	authService := services.NewAuthService(config, entityRepo, userRepo)
+	projectService := services.NewProjectService(config, entityRepo, projectRepo, projectAuthSettingRepo, kubeProjectRepo)
+	// authService := services.NewAuthService(config, entityRepo, userRepo)
 
-	//////////// Init Controllers //////////
-	authController := controllers.NewAuthController(config, authService)
+	// //////////// Init Controllers //////////
+	// authController := controllers.NewAuthController(config, authService)
 	projectController := controllers.NewProjectController(config, projectService)
 
-	cli := router.NewAPICli(config, authController, projectController)
+	cli := router.NewAPICli(config, projectController)
 
 	cli.Run()
 }

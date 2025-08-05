@@ -1,10 +1,11 @@
 package services
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
 	"baas-api/internal/dto"
 	"baas-api/internal/models"
 	"baas-api/internal/repo"
+	"baas-api/internal/repo/kube"
 	"context"
 	"time"
 
@@ -20,57 +21,104 @@ type ProjectService interface {
 }
 
 type projectService struct {
-	entityRepo      repo.EntityRepository
-	projectRepo     repo.ProjectRepository
-	kubeProjectRepo repo.KubeProjectRepository
-	namespace       string
+	config *config.Config
+	repo   struct {
+		entity             repo.EntityRepository
+		project            repo.ProjectRepository
+		projectAuthSetting repo.ProjectAuthSettingRepository
+		kubeProject        kube.KubeProjectRepository
+	}
 }
 
-func NewProjectService(config *configs.Config, ep repo.EntityRepository, pp repo.ProjectRepository, kp repo.KubeProjectRepository) ProjectService {
-	return &projectService{
-		entityRepo:      ep,
-		projectRepo:     pp,
-		kubeProjectRepo: kp,
-		namespace:       config.Kube.ProjectsNamespace,
-	}
+func NewProjectService(config *config.Config, ep repo.EntityRepository, pp repo.ProjectRepository, ps repo.ProjectAuthSettingRepository, kp kube.KubeProjectRepository) ProjectService {
+	service := &projectService{}
+	service.config = config
+	service.repo.entity = ep
+	service.repo.project = pp
+	service.repo.projectAuthSetting = ps
+	service.repo.kubeProject = kp
+	return service
 }
 
 func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error) {
-	projectEntity, err := s.entityRepo.GetByChineseName(ctx, "專案")
+	projectEntity, err := s.repo.entity.GetByChineseName(ctx, "專案")
 	if err != nil {
 		return nil, err
 	}
 
-	id, ref, err := s.projectRepo.Create(ctx, in.Body.Name, in.Body.Description, projectEntity.ID, userID)
-	if err != nil {
-		return nil, err
-	}
+	// Cleanup if any error occurs
+	var cleanupFuncs []func()
+	var success bool
+	defer func() {
+		if success {
+			cleanupFuncs = nil // Clear cleanup functions if successful
+			return
+		}
 
-	err = s.kubeProjectRepo.CreateCluster(ctx, s.namespace, *ref, in.Body.StorageSize)
-	if err != nil {
-		// Try to clean up the cluster if creation fails
-		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
-		return nil, err
-	}
+		for i := len(cleanupFuncs) - 1; i >= 0; i-- {
+			cleanupFuncs[i]()
+		}
+	}()
 
-	err = s.kubeProjectRepo.CreateDatabase(ctx, s.namespace, *ref)
+	id, ref, err := s.repo.project.Create(ctx, in.Body.Name, in.Body.Description, projectEntity.ID, userID)
 	if err != nil {
-		// Try to clean up the cluster if database creation fails
-		_ = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, *ref)
-		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.project.DeleteByID(ctx, *id)
+	})
 
-	err = s.kubeProjectRepo.CreateIngressRouteTCP(ctx, s.namespace, *ref)
+	projectAuthSetting := &models.ProjectAuthSettings{
+		ProjectID: *id,
+	}
+	err = s.repo.projectAuthSetting.Create(ctx, projectAuthSetting)
 	if err != nil {
-		// Try to clean up the cluster and database if ingress route creation fails
-		_ = s.kubeProjectRepo.DeleteDatabase(ctx, s.namespace, *ref)
-		_ = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, *ref)
-		_ = s.projectRepo.DeleteByIDPermanently(ctx, *id)
 		return nil, err
 	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.projectAuthSetting.DeleteByProjectID(ctx, *id)
+	})
+
+	err = s.repo.kubeProject.CreateCluster(ctx, s.config.Kube.Project.Namespace, *ref, in.Body.StorageSize)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteCluster(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
+
+	err = s.repo.kubeProject.CreateDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
+
+	err = s.repo.kubeProject.CreateIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
+
+	err = s.repo.kubeProject.CreateAPIDeployment(ctx,
+		kube.NewAPIDeploymentOption().
+			WithNamespace(s.config.Kube.Project.Namespace).
+			WithRef(*ref).
+			WithBetterAuthSecret(projectAuthSetting.Secret).
+			WithEmailAndPasswordAuth(projectAuthSetting.EmailAndPasswordEnabled),
+	)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
 
 	time.Sleep(time.Millisecond * 50)
+	success = true // Mark as successful if we reach here without errors
 
 	out := &dto.CreateProjectOutput{}
 	out.Body.ID = *id
@@ -80,7 +128,7 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 }
 
 func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
-	project, err := s.projectRepo.FindByRef(ctx, in.Reference)
+	project, err := s.repo.project.FindByRef(ctx, in.Reference)
 	if err != nil {
 		return nil, err
 	}
@@ -88,23 +136,23 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		return nil, huma.Error401Unauthorized("Unauthorized")
 	}
 
-	err = s.kubeProjectRepo.DeleteCluster(ctx, s.namespace, in.Reference)
+	err = s.repo.kubeProject.DeleteCluster(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.kubeProjectRepo.DeleteDatabase(ctx, s.namespace, in.Reference)
+	err = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		// If the database deletion fails, we should not proceed with deleting the project entry
 		return nil, err
 	}
 
-	err = s.projectRepo.DeleteByRefPermanently(ctx, in.Reference)
+	err = s.repo.project.DeleteByRef(ctx, in.Reference)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.kubeProjectRepo.DeleteIngressRouteTCP(ctx, s.namespace, in.Reference)
+	err = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +164,7 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 }
 
 func (s *projectService) GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error) {
-	projects, err := s.projectRepo.FindAllByUserID(ctx, userID)
+	projects, err := s.repo.project.FindAllByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +173,7 @@ func (s *projectService) GetUsersProjects(ctx context.Context, userID string) ([
 }
 
 func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error) {
-	project, err := s.projectRepo.FindByRef(ctx, ref)
+	project, err := s.repo.project.FindByRef(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +186,7 @@ func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID st
 }
 
 func (s *projectService) ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error) {
-	err := s.kubeProjectRepo.ResetDatabasePassword(ctx, s.namespace, in.Body.Reference, in.Body.Password)
+	err := s.repo.kubeProject.ResetDatabasePassword(ctx, s.config.Kube.Project.Namespace, in.Body.Reference, in.Body.Password)
 	if err != nil {
 		return nil, err
 	}

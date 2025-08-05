@@ -1,15 +1,15 @@
 package i3s
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
 )
 
 type I3S struct {
-	config *configs.Config
+	config *config.Config
 	// service *services.Service
 }
 
-func NewI3S(config *configs.Config) *I3S {
+func NewI3S(config *config.Config) *I3S {
 	return &I3S{
 		config: config,
 		// service: service,

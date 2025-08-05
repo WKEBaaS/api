@@ -1,83 +1,89 @@
+// Package middlewares
+//
+// BaaS API Auth Middleware
 package middlewares
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
-	"slices"
-	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
-// NewAuthMiddleWare creates a middleware that checks if the user has the required roles
-// to access the API endpoint based on the JWT token provided in the Authorization header.
-//
-// Note: This function created middleware will update the user's info in the context with
-// the "UserID" key if the token is valid.
-func NewAuthMiddleWare(api huma.API, config *configs.Config, authSchema string) func(huma.Context, func(huma.Context)) {
+type Session struct {
+	CreatedAt time.Time `json:"createdAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	Token     string    `json:"token"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	UserID    string    `json:"userId"`
+	ID        string    `json:"id,omitempty"`
+	IPAddress string    `json:"ipAddress,omitempty"`
+	UserAgent string    `json:"userAgent,omitempty"`
+}
+
+// User represents a user in the system
+type User struct {
+	CreatedAt     time.Time `json:"createdAt"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"emailVerified"`
+	Name          string    `json:"name"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	ID            string    `json:"id,omitempty"`
+	Image         string    `json:"image,omitempty"`
+}
+
+type GetSessionResponse struct {
+	Session Session `json:"session"`
+	User    User    `json:"user"`
+}
+
+func NewAuthMiddleware(api huma.API, config *config.Config) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		var anyOfNeededRoles []string
-		isAuthorizationRequired := false
-		for _, opScheme := range ctx.Operation().Security {
-			var ok bool
-			if anyOfNeededRoles, ok = opScheme[authSchema]; ok {
-				isAuthorizationRequired = true
-				break
-			}
-		}
-
-		if !isAuthorizationRequired {
-			next(ctx)
-			return
-		}
-
-		token := strings.TrimPrefix(ctx.Header("Authorization"), "Bearer ")
-		if len(token) == 0 {
-			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-			return
-		}
-
-		parsed, err := jwt.ParseString(token,
-			jwt.WithKey(config.JWK.Algorithm, config.JWK.PublicKey),
-			jwt.WithValidate(true),
-			jwt.WithIssuer(config.JWK.Issuer),
-		)
+		getSessionURL := config.Auth.URL.JoinPath("/get-session")
+		req, err := http.NewRequest(http.MethodGet, getSessionURL.String(), nil)
 		if err != nil {
-			slog.WarnContext(ctx.Context(), "Failed to parse JWT token", "error", err)
-			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+			slog.Error("Failed to create request for session", "error", err)
+			huma.WriteErr(api, ctx, http.StatusInternalServerError, "Failed to create request for session")
 			return
 		}
 
-		// Update the context with the user ID from the JWT token
-		sub, ok := parsed.Subject()
-		if !ok || sub == "" {
-			slog.WarnContext(ctx.Context(), "JWT token does not contain a valid subject", "token", token)
-			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-			return
+		cookies := huma.ReadCookies(ctx)
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
 		}
-		ctx = huma.WithValue(ctx, "UserID", sub)
 
-		var roles []any
-		err = parsed.Get("baas_roles", &roles)
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
 		if err != nil {
-			slog.WarnContext(ctx.Context(), "Failed to get roles from JWT token", "error", err)
-			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+			slog.Error("Failed to get session", "error", err)
+			huma.WriteErr(api, ctx, http.StatusInternalServerError, "Failed to get session")
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			slog.Info("Invalid session", "status", resp.StatusCode, "message", string(body))
+			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Invalid session")
 			return
 		}
 
-		for _, role := range roles {
-			if roleStr, ok := role.(string); ok {
-				if slices.Contains(anyOfNeededRoles, roleStr) {
-					slog.DebugContext(ctx.Context(), "User has required role", "role", roleStr)
-					next(ctx)
-					return
-				}
-			}
+		sessionResp := &GetSessionResponse{}
+		if err := json.NewDecoder(resp.Body).Decode(&sessionResp); err != nil {
+			slog.Error("Failed to decode session response", "error", err)
 		}
 
-		slog.WarnContext(ctx.Context(), "User does not have any required roles", "requiredRoles", anyOfNeededRoles, "userRoles", roles)
-		huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden: insufficient permissions")
+		if sessionResp == nil {
+			huma.WriteErr(api, ctx, http.StatusUnauthorized, "Session not found")
+			return
+		}
+
+		ctx = huma.WithValue(ctx, "session", sessionResp.Session)
+		ctx = huma.WithValue(ctx, "user", sessionResp.User)
+		next(ctx)
 	}
 }

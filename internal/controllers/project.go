@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
 	"baas-api/internal/controllers/middlewares"
 	"baas-api/internal/dto"
 	"baas-api/internal/services"
@@ -23,11 +23,11 @@ type ProjectController interface {
 }
 
 type projectController struct {
-	config         *configs.Config
+	config         *config.Config
 	projectService services.ProjectService
 }
 
-func NewProjectController(config *configs.Config, projectService services.ProjectService) ProjectController {
+func NewProjectController(config *config.Config, projectService services.ProjectService) ProjectController {
 	return &projectController{
 		config:         config,
 		projectService: projectService,
@@ -35,8 +35,7 @@ func NewProjectController(config *configs.Config, projectService services.Projec
 }
 
 func (c *projectController) RegisterProjectAPIs(api huma.API) {
-	authMiddleware := middlewares.NewAuthMiddleWare(api, c.config, "baasAuth")
-
+	authMiddleware := middlewares.NewAuthMiddleware(api, c.config)
 	type MessageEvent struct {
 		Content string `json:"content"`
 	}
@@ -46,10 +45,11 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Path:        "/test",
 		Summary:     "Test Endpoint",
 		Tags:        []string{"Test"},
+		Middlewares: huma.Middlewares{authMiddleware, middlewares.TLSMiddleware},
 	}, map[string]any{
 		"message": MessageEvent{},
 	}, func(ctx context.Context, in *struct{}, send sse.Sender) {
-		for range 3 {
+		for range 1 {
 			send.Data(MessageEvent{Content: "Hello, World!"})
 			time.Sleep(1 * time.Second)
 		}
@@ -62,9 +62,6 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Summary:     "Get Project by Reference",
 		Description: "Retrieve a project by its reference. The reference is a 20-character string.",
 		Tags:        []string{"Project"},
-		Security: []map[string][]string{
-			{"baasAuth": {"project:manage", "project:read"}},
-		},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.getProjectByRef)
 
@@ -75,10 +72,7 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Summary:     "Create Project",
 		Description: "Create a new project with the specified name and storage size.",
 		Tags:        []string{"Project"},
-		Security: []map[string][]string{
-			{"baasAuth": {"project:manage", "project:create"}},
-		},
-		Middlewares: huma.Middlewares{authMiddleware, middlewares.TLSMiddleware},
+		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.createProject)
 
 	huma.Register(api, huma.Operation{
@@ -88,9 +82,6 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Summary:     "Delete Project by Reference",
 		Description: "Delete a project by its reference. The reference is a 20-character string.",
 		Tags:        []string{"Project"},
-		Security: []map[string][]string{
-			{"baasAuth": {"project:manage", "project:delete"}},
-		},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.deleteProjectByRef)
 
@@ -101,9 +92,6 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Summary:     "Get User's Projects",
 		Description: "Retrieve all projects associated with the authenticated user.",
 		Tags:        []string{"Project"},
-		Security: []map[string][]string{
-			{"baasAuth": {"project:manage", "project:read"}},
-		},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.getUsersProjects)
 
@@ -114,19 +102,16 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Summary:     "Reset Database Password",
 		Description: "Reset the database password for a project. The reference is a 20-character string.",
 		Tags:        []string{"Project"},
-		Security: []map[string][]string{
-			{"baasAuth": {"project:manage", "project:write"}},
-		},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.resetDatabasePassword)
 }
 
 func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error) {
-	userID, err := GetUserIDFromContext(ctx)
+	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out, err := c.projectService.GetUserProjectByRef(ctx, in.Ref, *userID)
+	out, err := c.projectService.GetUserProjectByRef(ctx, in.Ref, session.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -134,12 +119,12 @@ func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProj
 }
 
 func (c *projectController) createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error) {
-	userID, err := GetUserIDFromContext(ctx)
+	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := c.projectService.CreateProject(ctx, in, userID)
+	out, err := c.projectService.CreateProject(ctx, in, &session.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +133,12 @@ func (c *projectController) createProject(ctx context.Context, in *dto.CreatePro
 }
 
 func (c *projectController) deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error) {
-	userID, err := GetUserIDFromContext(ctx)
+	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := c.projectService.DeleteProjectByRef(ctx, in, *userID)
+	out, err := c.projectService.DeleteProjectByRef(ctx, in, session.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,12 +147,12 @@ func (c *projectController) deleteProjectByRef(ctx context.Context, in *dto.Dele
 }
 
 func (c *projectController) getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error) {
-	userID, err := GetUserIDFromContext(ctx)
+	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	projects, err := c.projectService.GetUsersProjects(ctx, *userID)
+	projects, err := c.projectService.GetUsersProjects(ctx, session.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,12 +164,12 @@ func (c *projectController) getUsersProjects(ctx context.Context, in *dto.GetUse
 }
 
 func (c *projectController) resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error) {
-	userID, err := GetUserIDFromContext(ctx)
+	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := c.projectService.ResetDatabasePassword(ctx, in, *userID)
+	out, err := c.projectService.ResetDatabasePassword(ctx, in, session.UserID)
 	if err != nil {
 		return nil, err
 	}

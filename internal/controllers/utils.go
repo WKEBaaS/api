@@ -1,17 +1,19 @@
+// Package controllers
 package controllers
 
 import (
+	"baas-api/internal/controllers/middlewares"
 	"context"
 	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
 )
 
-func GetUserIDFromContext(ctx context.Context) (*string, error) {
-	userID, ok := ctx.Value("UserID").(string)
-	if !ok || userID == "" {
-		slog.WarnContext(ctx, "User ID not found in context")
-		return nil, huma.Error401Unauthorized("Unauthorized")
+func GetSessionFromContext(ctx context.Context) (*middlewares.Session, error) {
+	session, ok := ctx.Value("session").(middlewares.Session)
+	if !ok {
+		slog.ErrorContext(ctx, "Session not found in context")
+		return nil, huma.Error401Unauthorized("Session not found in context")
 	}
-	return &userID, nil
+	return &session, nil
 }

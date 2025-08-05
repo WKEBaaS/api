@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"baas-api/internal/configs"
+	"baas-api/config"
 	"log"
 	"os"
 	"testing"
@@ -15,17 +15,19 @@ import (
 )
 
 var (
-	db  *gorm.DB
-	err error
-	pp  ProjectRepository
-	ep  EntityRepository
+	db *gorm.DB
+	pp ProjectRepository
+	ep EntityRepository
 )
 
 func TestMain(m *testing.M) {
-	config := configs.LoadConfig()
+	config, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
 
 	// ////////// Init Gorm Database //////////
-	db, err = gorm.Open(postgres.Open(config.DatabaseURL), &gorm.Config{
+	db, err = gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{
 		Logger: logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
 			// SlowThreshold: time.Second,
 			LogLevel: logger.Info,
@@ -77,7 +79,7 @@ func TestProjectRepository_ByID(t *testing.T) {
 		t.Fatalf("Failed to delete project: %v", err)
 	}
 
-	err = pp.DeleteByIDPermanently(t.Context(), NewProjectID)
+	err = pp.DeleteByID(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to permanently delete project: %v", err)
 	}
@@ -107,7 +109,7 @@ func TestProjectRepository_ByRef(t *testing.T) {
 		t.Fatalf("Failed to delete project: %v", err)
 	}
 
-	err = pp.DeleteByIDPermanently(t.Context(), NewProjectID)
+	err = pp.DeleteByID(t.Context(), NewProjectID)
 	if err != nil {
 		t.Fatalf("Failed to permanently delete project: %v", err)
 	}

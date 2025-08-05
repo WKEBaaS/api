@@ -16,7 +16,7 @@ var postgresMigrations embed.FS
 
 func (i3s *I3S) Migrate() error {
 	// db, err := pgx.Connect(context.Background(), config.DatabaseURL)
-	db, err := sql.Open("pgx", i3s.config.DatabaseURL)
+	db, err := sql.Open("pgx", i3s.config.Database.URL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
