@@ -2,18 +2,15 @@ package main
 
 import (
 	"baas-api/config"
-	"baas-api/internal/controllers"
-	"baas-api/internal/i3s"
-	"baas-api/internal/repo"
-	"baas-api/internal/repo/kube"
-	"baas-api/internal/router"
-	"baas-api/internal/services"
+	"baas-api/controllers"
+	"baas-api/i3s"
+	"baas-api/repo"
+	"baas-api/repo/kube"
+	"baas-api/router"
+	"baas-api/services"
 	"log"
 	"time"
 
-	// "time"
-	//
-	// "github.com/patrickmn/go-cache"
 	"github.com/patrickmn/go-cache"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

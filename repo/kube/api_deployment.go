@@ -1,7 +1,7 @@
 package kube
 
 import (
-	"baas-api/internal/utils"
+	"baas-api/utils"
 	"context"
 	"fmt"
 	"log/slog"
@@ -173,7 +173,7 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *Cr
 					Containers: []corev1.Container{
 						{
 							Name:  deploymentName,
-							Image: "ghcr.io/wkebaas/project-auth:v0.0.11",
+							Image: "ghcr.io/wkebaas/project-auth:v0.0.12",
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 3000,

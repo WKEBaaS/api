@@ -2,10 +2,10 @@ package services
 
 import (
 	"baas-api/config"
-	"baas-api/internal/dto"
-	"baas-api/internal/models"
-	"baas-api/internal/repo"
-	"baas-api/internal/repo/kube"
+	"baas-api/dto"
+	"baas-api/models"
+	"baas-api/repo"
+	"baas-api/repo/kube"
 	"context"
 	"time"
 
@@ -17,6 +17,7 @@ type ProjectService interface {
 	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
+	GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error
 	ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error)
 }
 
@@ -102,7 +103,6 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
-
 	err = s.repo.kubeProject.CreateAPIDeployment(ctx,
 		kube.NewAPIDeploymentOption().
 			WithNamespace(s.config.Kube.Project.Namespace).
@@ -117,9 +117,7 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
-	time.Sleep(time.Millisecond * 50)
 	success = true // Mark as successful if we reach here without errors
-
 	out := &dto.CreateProjectOutput{}
 	out.Body.ID = *id
 	out.Body.Reference = *ref
@@ -157,6 +155,11 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		return nil, err
 	}
 
+	err = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	if err != nil {
+		return nil, err
+	}
+
 	out := &dto.DeleteProjectByRefOutput{}
 	out.Body.Success = true
 
@@ -170,6 +173,34 @@ func (s *projectService) GetUsersProjects(ctx context.Context, userID string) ([
 	}
 
 	return projects, nil
+}
+
+func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error {
+	project, err := s.repo.project.FindByRef(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if project.OwnerID != userID {
+		return huma.Error401Unauthorized("Unauthorized")
+	}
+
+	for {
+		status, err := s.repo.kubeProject.FindClusterStatus(ctx, s.config.Kube.Project.Namespace, ref)
+		if err != nil {
+			return err
+		}
+		if status == nil {
+			c <- dto.MessageEvent{Message: "Postgres cluster is not ready yet."}
+			continue
+		}
+		if *status == "Cluster in healthy state" {
+			c <- dto.MessageEvent{Message: "Postgres cluster is ready."}
+			break
+		}
+		c <- dto.MessageEvent{Message: *status}
+		time.Sleep(time.Second * 1)
+	}
+	return nil
 }
 
 func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error) {

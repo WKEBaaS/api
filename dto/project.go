@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"baas-api/internal/models"
+	"baas-api/models"
 	"net/http"
 )
 

@@ -17,6 +17,7 @@ import (
 type KubeProjectRepository interface {
 	CreateCluster(ctx context.Context, namespace string, ref string, storageSize string) error
 	DeleteCluster(ctx context.Context, namespace string, ref string) error
+	FindClusterStatus(ctx context.Context, namespace string, ref string) (*string, error)
 
 	CreateDatabase(ctx context.Context, namespace string, ref string) error
 	DeleteDatabase(ctx context.Context, namespace string, ref string) error

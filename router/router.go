@@ -14,6 +14,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 )
 
 type Options struct {
@@ -34,6 +35,11 @@ func NewAPICli(appConfig *config.Config, controllers ...any) humacli.CLI {
 		// app := fiber.New()
 		router := chi.NewMux()
 		router.Use(middleware.Logger)
+		router.Use(cors.Handler(cors.Options{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
+		}))
 
 		////////// Register APIs //////////
 		api := humachi.New(router, humaConfig)

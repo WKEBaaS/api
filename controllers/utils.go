@@ -2,7 +2,7 @@
 package controllers
 
 import (
-	"baas-api/internal/controllers/middlewares"
+	"baas-api/controllers/middlewares"
 	"context"
 	"log/slog"
 

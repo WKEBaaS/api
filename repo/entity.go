@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"baas-api/internal/models"
+	"baas-api/models"
 	"context"
 	"errors"
 	"log/slog"

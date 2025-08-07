@@ -5,6 +5,7 @@ package kube
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 
@@ -61,4 +62,23 @@ func (r *kubeProjectRepository) DeleteCluster(ctx context.Context, namespace str
 	}
 
 	return nil
+}
+
+func (r *kubeProjectRepository) FindClusterStatus(ctx context.Context, namespace string, ref string) (*string, error) {
+	deployment, err := r.dynamicClient.Resource(clusterGVR).
+		Namespace(namespace).
+		Get(ctx, ref, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("Failed to get postgres cluster", "error", err)
+		return nil, errors.New("failed to get postgres cluster")
+	}
+
+	status := deployment.Object["status"].(map[string]any)
+	phase, ok := status["phase"].(string)
+	if !ok {
+		paste := "Postgres cluster initializing"
+		return &paste, nil
+	}
+
+	return &phase, nil
 }

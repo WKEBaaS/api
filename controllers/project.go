@@ -2,10 +2,11 @@ package controllers
 
 import (
 	"baas-api/config"
-	"baas-api/internal/controllers/middlewares"
-	"baas-api/internal/dto"
-	"baas-api/internal/services"
+	"baas-api/controllers/middlewares"
+	"baas-api/dto"
+	"baas-api/services"
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 type ProjectController interface {
 	RegisterProjectAPIs(api huma.API)
 	getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error)
+	getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
 	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error)
 	getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error)
@@ -36,22 +38,43 @@ func NewProjectController(config *config.Config, projectService services.Project
 
 func (c *projectController) RegisterProjectAPIs(api huma.API) {
 	authMiddleware := middlewares.NewAuthMiddleware(api, c.config)
-	type MessageEvent struct {
-		Content string `json:"content"`
-	}
 	sse.Register(api, huma.Operation{
 		OperationID: "test",
-		Method:      http.MethodGet,
+		Method:      http.MethodPost,
 		Path:        "/test",
 		Summary:     "Test Endpoint",
 		Tags:        []string{"Test"},
-		Middlewares: huma.Middlewares{authMiddleware, middlewares.TLSMiddleware},
+		// Middlewares: huma.Middlewares{authMiddleware, middlewares.TLSMiddleware},
 	}, map[string]any{
-		"message": MessageEvent{},
+		"project-status": dto.MessageEvent{},
 	}, func(ctx context.Context, in *struct{}, send sse.Sender) {
-		for range 1 {
-			send.Data(MessageEvent{Content: "Hello, World!"})
-			time.Sleep(1 * time.Second)
+		ch := make(chan any, 1)
+
+		go func() {
+			defer close(ch)
+
+			// Simulate some data being sent
+			for i := range 5 {
+				ch <- dto.MessageEvent{Message: "Test message " + fmt.Sprint(i)}
+				// Simulate a delay
+				time.Sleep(500 * time.Millisecond)
+			}
+		}()
+
+		for {
+			select {
+			case data, ok := <-ch:
+				if !ok {
+					// Channel was closed, so we are done.
+					return
+				}
+				if err := send.Data(data); err != nil {
+					return
+				}
+			case <-ctx.Done():
+				// Context was canceled, so we are done.
+				return
+			}
 		}
 	})
 
@@ -74,6 +97,20 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.createProject)
+
+	sse.Register(api, huma.Operation{
+		OperationID: "get-project-status",
+		Method:      "GET",
+		Path:        "/project/status",
+		Summary:     "Get Project Status (SSE)",
+		Description: "Get the status of a project by its reference. The reference is a 20-character string.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	},
+		map[string]any{
+			"message": dto.MessageEvent{},
+			"error":   dto.ErrorEvent{},
+		}, c.getProjectStatus)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "delete-project-by-ref",
@@ -118,6 +155,42 @@ func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProj
 	return &dto.GetProjectByRefOutput{Body: *out}, nil
 }
 
+func (c *projectController) getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		send.Data(dto.ErrorEvent{Message: "Unauthorized access"})
+		return
+	}
+
+	dataChan := make(chan any, 1)
+
+	go func() {
+		defer close(dataChan)
+
+		err := c.projectService.GetUserProjectStatusByRef(ctx, dataChan, in.Ref, session.UserID)
+		if err != nil {
+			dataChan <- dto.ErrorEvent{Message: err.Error()}
+			return
+		}
+	}()
+
+	for {
+		select {
+		case data, ok := <-dataChan:
+			if !ok {
+				// Channel was closed, so we are done.
+				return
+			}
+			if err := send.Data(data); err != nil {
+				return
+			}
+		case <-ctx.Done():
+			// Context was canceled, so we are done.
+			return
+		}
+	}
+}
+
 func (c *projectController) createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
@@ -128,7 +201,6 @@ func (c *projectController) createProject(ctx context.Context, in *dto.CreatePro
 	if err != nil {
 		return nil, err
 	}
-
 	return out, nil
 }
 
