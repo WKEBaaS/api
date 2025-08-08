@@ -1,3 +1,4 @@
+// Package dto
 package dto
 
 import (
@@ -11,7 +12,7 @@ type AuthLoginInput struct {
 
 type AuthLoginOutput struct {
 	Status         int
-	Url            string       `header:"Location"`
+	URL            string       `header:"Location"`
 	NonceCookie    *http.Cookie `header:"Set-Cookie"`
 	StateCookie    *http.Cookie `header:"Set-Cookie"`
 	RedirectCookie *http.Cookie `header:"Set-Cookie"`
@@ -27,7 +28,7 @@ type AuthCallbackInput struct {
 
 type AuthCallbackOutput struct {
 	Status      int
-	Url         string       `header:"Location"`
+	URL         string       `header:"Location"`
 	TokenCookie *http.Cookie `header:"Set-Cookie"`
 	Body        struct {
 		Ok bool `json:"ok" doc:"true if the request was successful"`
@@ -40,6 +41,6 @@ type AuthLogoutInput struct {
 
 type AuthLogoutOutput struct {
 	Status      int
-	Url         url.URL      `header:"Location"`
+	URL         url.URL      `header:"Location"`
 	TokenCookie *http.Cookie `header:"Set-Cookie" doc:"Token cookie to be cleared"`
 }

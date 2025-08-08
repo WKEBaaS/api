@@ -5,9 +5,16 @@ import (
 	"net/http"
 )
 
+type OAuthProvider struct {
+	Enabled      bool
+	ClientID     string
+	ClientSecret string
+}
+
 type GetProjectByRefInput struct {
 	Ref string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
 }
+
 type GetProjectByRefOutput struct {
 	Body models.ProjectView
 }
@@ -19,12 +26,27 @@ type CreateProjectInput struct {
 		StorageSize string  `json:"storageSize" hidden:"true" default:"1Gi" example:"1Gi" doc:"Storage size for the project"`
 	}
 }
+
 type CreateProjectOutput struct {
 	Body struct {
 		ID        string `json:"id" doc:"Project ID (nanoid)"`
 		Reference string `json:"reference" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
 	}
 	InitPasswordCookie *http.Cookie `header:"Set-Cookie" doc:"Initial password cookie for database of the project"`
+}
+
+type PatchProjectSettingsInput struct {
+	Body struct {
+		Name           *string  `json:"name" maxLength:"100" example:"My Project" doc:"Project name"`
+		Description    *string  `json:"description" maxLength:"4000" required:"false" example:"This is my project" doc:"Project description"`
+		TrustedOrigins []string `json:"trustedOrigins" example:"https://example.com" doc:"List of trusted origins for CORS"`
+		Auth           *struct {
+			EmailAndPasswordEnabled *bool          `json:"emailAndPasswordEnabled" doc:"Enable email and password authentication"`
+			Google                  *OAuthProvider `json:"google" doc:"Google OAuth provider settings"`
+			GitHub                  *OAuthProvider `json:"github" doc:"GitHub OAuth provider settings"`
+			Discord                 *OAuthProvider `json:"discord" doc:"Discord OAuth provider settings"`
+		}
+	}
 }
 
 type DeleteProjectByRefInput struct {

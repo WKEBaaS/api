@@ -76,8 +76,8 @@ func (r *kubeProjectRepository) FindClusterStatus(ctx context.Context, namespace
 	status := deployment.Object["status"].(map[string]any)
 	phase, ok := status["phase"].(string)
 	if !ok {
-		paste := "Postgres cluster initializing"
-		return &paste, nil
+		phase = "Initializing Postgres cluster"
+		return &phase, nil
 	}
 
 	return &phase, nil

@@ -6,6 +6,7 @@ CREATE TABLE dbo.projects
     id               uuid        NOT NULL DEFAULT uuidv7(),
     reference        VARCHAR(20) NOT NULL UNIQUE,
     password_expired BOOLEAN              DEFAULT TRUE NOT NULL,
+    initialized_at boolean
     CONSTRAINT pk_dbo_projects PRIMARY KEY (id),
     CONSTRAINT fk_dbo_projects_id FOREIGN KEY (id) REFERENCES dbo.objects
 );

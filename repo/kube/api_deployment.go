@@ -3,6 +3,7 @@ package kube
 import (
 	"baas-api/utils"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/yaml"
 )
 
 type CreateAPIDeploymentOption struct {
@@ -191,7 +194,80 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *Cr
 	_, err := r.clientset.AppsV1().Deployments(opt.Namespace).Create(ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create API deployment", "error", err)
-		return fmt.Errorf("failed to create API deployment")
+		return errors.New("failed to create API deployment")
+	}
+
+	return nil
+}
+
+func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *CreateAPIDeploymentOption) error {
+	deploymentName := fmt.Sprintf("%s-api", ref)
+	envVars := []corev1.EnvVar{}
+	payload := &appsv1.Deployment{}
+
+	if opt.BetterAuthSecret != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "BETTER_AUTH_SECRET",
+			Value: opt.BetterAuthSecret,
+		})
+	}
+	if len(opt.TrustedOrigins) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "TRUSTED_ORIGINS",
+			Value: strings.Join(opt.TrustedOrigins, ","),
+		})
+	}
+	if opt.Auth.EmailAndPasswordEnabled {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "EMAIL_AND_PASSWORD_ENABLED",
+			Value: utils.BoolToString(opt.Auth.EmailAndPasswordEnabled),
+		})
+	}
+	if opt.Auth.Google != nil {
+		envVars = append(envVars,
+			corev1.EnvVar{Name: "GOOGLE_ENABLED", Value: utils.BoolToString(opt.Auth.Google.Enabled)},
+			corev1.EnvVar{Name: "GOOGLE_CLIENT_ID", Value: opt.Auth.Google.ClientID},
+			corev1.EnvVar{Name: "GOOGLE_CLIENT_SECRET", Value: opt.Auth.Google.ClientSecret},
+		)
+	}
+	if opt.Auth.GitHub != nil {
+		envVars = append(envVars,
+			corev1.EnvVar{Name: "GITHUB_ENABLED", Value: utils.BoolToString(opt.Auth.GitHub.Enabled)},
+			corev1.EnvVar{Name: "GITHUB_CLIENT_ID", Value: opt.Auth.GitHub.ClientID},
+			corev1.EnvVar{Name: "GITHUB_CLIENT_SECRET", Value: opt.Auth.GitHub.ClientSecret},
+		)
+	}
+	if opt.Auth.Discord != nil {
+		envVars = append(envVars,
+			corev1.EnvVar{Name: "DISCORD_ENABLED", Value: utils.BoolToString(opt.Auth.Discord.Enabled)},
+			corev1.EnvVar{Name: "DISCORD_CLIENT_ID", Value: opt.Auth.Discord.ClientID},
+			corev1.EnvVar{Name: "DISCORD_CLIENT_SECRET", Value: opt.Auth.Discord.ClientSecret},
+		)
+	}
+
+	payload.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Name: deploymentName,
+			Env:  envVars,
+		},
+	}
+	data, err := yaml.Marshal(payload)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to marshal deployment payload", "error", err)
+		return fmt.Errorf("failed to marshal deployment payload")
+	}
+
+	// Patch the deployment
+	_, err = r.clientset.AppsV1().Deployments(namespace).Patch(
+		ctx,
+		deploymentName,
+		types.StrategicMergePatchType,
+		data,
+		metav1.PatchOptions{},
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to patch API deployment", "error", err)
+		return fmt.Errorf("failed to patch API deployment")
 	}
 
 	return nil

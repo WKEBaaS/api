@@ -14,6 +14,7 @@ import (
 type AppConfig struct {
 	Port           string
 	Host           string
+	TrustedOrigins []string
 	ExternalDomain string
 	ExternalSecure bool
 }

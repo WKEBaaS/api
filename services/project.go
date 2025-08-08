@@ -7,6 +7,7 @@ import (
 	"baas-api/repo"
 	"baas-api/repo/kube"
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -184,23 +185,31 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 		return huma.Error401Unauthorized("Unauthorized")
 	}
 
+	totalStep := 4
 	for {
 		status, err := s.repo.kubeProject.FindClusterStatus(ctx, s.config.Kube.Project.Namespace, ref)
 		if err != nil {
 			return err
 		}
 		if status == nil {
-			c <- dto.MessageEvent{Message: "Postgres cluster is not ready yet."}
+			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is not ready yet.", Step: 0, TotalStep: totalStep}
 			continue
 		}
-		if *status == "Cluster in healthy state" {
-			c <- dto.MessageEvent{Message: "Postgres cluster is ready."}
-			break
+		switch *status {
+		case "Initializing Postgres cluster":
+			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is initializing...", Step: 1, TotalStep: totalStep}
+		case "Setting up primary":
+			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is setting up primary...", Step: 2, TotalStep: totalStep}
+		case "Waiting for the instances to become active":
+			c <- dto.ProjectStatusEvent{Message: "Postgres Waiting for the instances to become active", Step: 3, TotalStep: totalStep}
+		case "Cluster in healthy state":
+			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is ready.", Step: 4, TotalStep: totalStep}
+			return nil
+		default:
+			slog.Warn("Unknown Postgres cluster status", "status", *status)
 		}
-		c <- dto.MessageEvent{Message: *status}
 		time.Sleep(time.Second * 1)
 	}
-	return nil
 }
 
 func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error) {

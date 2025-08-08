@@ -21,7 +21,7 @@ type Options struct {
 	Debug bool `help:"Enable debug mode" short:"d" default:"false"`
 }
 
-func NewAPICli(appConfig *config.Config, controllers ...any) humacli.CLI {
+func NewAPICli(config *config.Config, controllers ...any) humacli.CLI {
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
 		slog.Info("Option.Debug", "debug", options.Debug)
 		if options.Debug {
@@ -36,9 +36,10 @@ func NewAPICli(appConfig *config.Config, controllers ...any) humacli.CLI {
 		router := chi.NewMux()
 		router.Use(middleware.Logger)
 		router.Use(cors.Handler(cors.Options{
-			AllowedOrigins: []string{"*"},
-			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
+			AllowedOrigins:   config.App.TrustedOrigins,
+			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+			AllowCredentials: true,
 		}))
 
 		////////// Register APIs //////////
@@ -51,8 +52,8 @@ func NewAPICli(appConfig *config.Config, controllers ...any) humacli.CLI {
 		}
 
 		hooks.OnStart(func() {
-			slog.Info("Starting server", "host", appConfig.App.Host, "port", appConfig.App.Port)
-			err := http.ListenAndServe(fmt.Sprintf("%s:%s", appConfig.App.Host, appConfig.App.Port), router)
+			slog.Info("Starting server", "host", config.App.Host, "port", config.App.Port)
+			err := http.ListenAndServe(fmt.Sprintf("%s:%s", config.App.Host, config.App.Port), router)
 			if err != nil {
 				slog.Error("Failed to start server", "error", err)
 			}

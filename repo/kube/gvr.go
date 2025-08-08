@@ -23,9 +23,3 @@ var ingressRouteTCPGVR = schema.GroupVersionResource{
 	Version:  "v1alpha1",
 	Resource: "ingressroutetcps",
 }
-
-var deploymentGVR = schema.GroupVersionResource{
-	Group:    "apps",
-	Version:  "v1",
-	Resource: "deployments",
-}

@@ -100,7 +100,7 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 
 	sse.Register(api, huma.Operation{
 		OperationID: "get-project-status",
-		Method:      "GET",
+		Method:      http.MethodGet,
 		Path:        "/project/status",
 		Summary:     "Get Project Status (SSE)",
 		Description: "Get the status of a project by its reference. The reference is a 20-character string.",
@@ -108,8 +108,8 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Middlewares: huma.Middlewares{authMiddleware},
 	},
 		map[string]any{
-			"message": dto.MessageEvent{},
-			"error":   dto.ErrorEvent{},
+			"project-status": dto.ProjectStatusEvent{},
+			"error":          dto.ErrorEvent{},
 		}, c.getProjectStatus)
 
 	huma.Register(api, huma.Operation{

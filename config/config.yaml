@@ -4,6 +4,10 @@ app:
   port: "8080"
   # The host address for the application server.
   host: "0.0.0.0"
+  # List of trusted origins for CORS and other security policies.
+  trustedOrigins:
+    - "https://app.example.com"
+    - "https://api.example.com"
   # The external domain name for the application. Used for generating external URLs.
   externalDomain: "app.example.com"
   # A boolean to indicate if the external domain uses HTTPS.
