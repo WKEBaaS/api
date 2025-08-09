@@ -24,11 +24,17 @@ type KubeProjectRepository interface {
 	ReadDatabasePassword(ctx context.Context, namespace string, ref string) (*string, error)
 	ResetDatabasePassword(ctx context.Context, namespace string, ref string, password string) error
 
+	// BaaS Project API
+	CreateAPIDeployment(ctx context.Context, opt *APIDeploymentOption) error
+	DeleteAPIDeployment(ctx context.Context, namespace string, ref string) error
+	PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error
+	CreateAPIService(ctx context.Context, namespace string, ref string) error
+	DeleteAPIService(ctx context.Context, namespace string, ref string) error
+
+	CreateIngressRoute(ctx context.Context, namespace string, ref string) error
+	DeleteIngressRoute(ctx context.Context, namespace string, ref string) error
 	CreateIngressRouteTCP(ctx context.Context, namespace string, ref string) error
 	DeleteIngressRouteTCP(ctx context.Context, namespace string, ref string) error
-
-	CreateAPIDeployment(ctx context.Context, opt *CreateAPIDeploymentOption) error
-	DeleteAPIDeployment(ctx context.Context, namespace string, ref string) error
 }
 
 type kubeProjectRepository struct {

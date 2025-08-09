@@ -23,3 +23,9 @@ var ingressRouteTCPGVR = schema.GroupVersionResource{
 	Version:  "v1alpha1",
 	Resource: "ingressroutetcps",
 }
+
+var ingressRouteGVR = schema.GroupVersionResource{
+	Group:    "traefik.io",
+	Version:  "v1alpha1",
+	Resource: "ingressroutes",
+}

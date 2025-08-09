@@ -6,9 +6,9 @@ import (
 )
 
 type OAuthProvider struct {
-	Enabled      bool
-	ClientID     string
-	ClientSecret string
+	Enabled      bool   `json:"enabled" doc:"Enable this OAuth provider"`
+	ClientID     string `json:"clientId" doc:"OAuth Client ID"`
+	ClientSecret string `json:"clientSecret" doc:"OAuth Clien Secret"`
 }
 
 type GetProjectByRefInput struct {
@@ -35,17 +35,18 @@ type CreateProjectOutput struct {
 	InitPasswordCookie *http.Cookie `header:"Set-Cookie" doc:"Initial password cookie for database of the project"`
 }
 
-type PatchProjectSettingsInput struct {
+type PatchProjectSettingInput struct {
 	Body struct {
-		Name           *string  `json:"name" maxLength:"100" example:"My Project" doc:"Project name"`
-		Description    *string  `json:"description" maxLength:"4000" required:"false" example:"This is my project" doc:"Project description"`
-		TrustedOrigins []string `json:"trustedOrigins" example:"https://example.com" doc:"List of trusted origins for CORS"`
+		Ref            string   `json:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+		Name           *string  `json:"name,omitempty" maxLength:"100" example:"My Project" doc:"Project name"`
+		Description    *string  `json:"description,omitempty" maxLength:"4000" required:"false" example:"This is my project" doc:"Project description"`
+		TrustedOrigins []string `json:"trustedOrigins,omitempty" example:"https://example.com" doc:"List of trusted origins for CORS"`
 		Auth           *struct {
-			EmailAndPasswordEnabled *bool          `json:"emailAndPasswordEnabled" doc:"Enable email and password authentication"`
-			Google                  *OAuthProvider `json:"google" doc:"Google OAuth provider settings"`
-			GitHub                  *OAuthProvider `json:"github" doc:"GitHub OAuth provider settings"`
-			Discord                 *OAuthProvider `json:"discord" doc:"Discord OAuth provider settings"`
-		}
+			EmailAndPasswordEnabled *bool          `json:"emailAndPasswordEnabled,omitempty" doc:"Enable email and password authentication"`
+			Google                  *OAuthProvider `json:"google,omitempty" doc:"Google OAuth provider settings"`
+			GitHub                  *OAuthProvider `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
+			Discord                 *OAuthProvider `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
+		} `json:"auth,omitempty" doc:"Authentication settings for the project"`
 	}
 }
 

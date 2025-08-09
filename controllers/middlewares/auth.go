@@ -52,7 +52,6 @@ func NewAuthMiddleware(api huma.API, config *config.Config) func(huma.Context, f
 		}
 
 		cookies := huma.ReadCookies(ctx)
-		slog.Info("Reading cookies for session", "cookies", cookies)
 		for _, cookie := range cookies {
 			req.AddCookie(cookie)
 		}

@@ -42,6 +42,8 @@ type ProjectRepository interface {
 	FindByRef(ctx context.Context, ref string) (*models.ProjectView, error)
 	// FindAllByUserID 依使用者 ID 取得所有專案 (包含關聯的 Object)。
 	FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error)
+	// UpdateByRef 更新專案資訊 (包含關聯的 Object)，依 Reference。
+	UpdateByRef(ctx context.Context, ref string, p *models.Project) error
 }
 
 type projectRepository struct {
@@ -116,7 +118,6 @@ func (r *projectRepository) DeleteByIDSoft(ctx context.Context, id string) error
 		slog.ErrorContext(ctx, "Transaction failed during soft delete project by ID", "projectID", id, "error", txErr)
 		return ErrTransactionFailed
 	}
-	slog.InfoContext(ctx, "Project soft deleted successfully by ID", "projectID", id)
 	return nil
 }
 
@@ -151,7 +152,6 @@ func (r *projectRepository) DeleteByID(ctx context.Context, id string) error {
 		slog.ErrorContext(ctx, "Transaction failed during permanent delete project by ID", "projectID", id, "error", txErr)
 		return ErrTransactionFailed
 	}
-	slog.InfoContext(ctx, "Project permanently deleted successfully by ID", "projectID", id)
 	return nil
 }
 
@@ -190,7 +190,6 @@ func (r *projectRepository) DeleteByRefSoft(ctx context.Context, ref string) err
 		slog.ErrorContext(ctx, "Transaction failed during soft delete project by reference", "projectRef", ref, "error", txErr)
 		return ErrTransactionFailed
 	}
-	slog.InfoContext(ctx, "Project soft deleted successfully by reference", "projectRef", ref, "deletedProjectID", project.ID)
 	return nil
 }
 
@@ -229,7 +228,6 @@ func (r *projectRepository) DeleteByRef(ctx context.Context, ref string) error {
 		slog.ErrorContext(ctx, "Transaction failed during permanent delete project by reference", "projectRef", ref, "error", txErr)
 		return errors.New("transaction failed during permanent delete project by reference")
 	}
-	slog.InfoContext(ctx, "Project permanently deleted successfully by reference", "projectRef", ref, "deletedProjectID", project.ID)
 	return nil
 }
 
@@ -243,7 +241,6 @@ func (r *projectRepository) FindByID(ctx context.Context, id string) (*models.Pr
 		slog.ErrorContext(ctx, "Failed to get project by ID", "projectID", id, "error", err)
 		return nil, errors.New("failed to get project by ID")
 	}
-	slog.InfoContext(ctx, "Project retrieved successfully by ID", "projectID", id)
 	return &project, nil
 }
 
@@ -257,7 +254,6 @@ func (r *projectRepository) FindByRef(ctx context.Context, ref string) (*models.
 		slog.ErrorContext(ctx, "Failed to get project by reference", "projectRef", ref, "error", err)
 		return nil, errors.New("failed to get project by reference")
 	}
-	slog.InfoContext(ctx, "Project retrieved successfully by reference", "projectRef", ref, "projectID", project.ID)
 	return &project, nil
 }
 
@@ -274,4 +270,18 @@ func (r *projectRepository) FindAllByUserID(ctx context.Context, userID string) 
 		return nil, ErrFindUsersProjectsFailed
 	}
 	return projects, nil
+}
+
+func (r *projectRepository) UpdateByRef(ctx context.Context, ref string, p *models.Project) error {
+	if err := r.db.WithContext(ctx).Model(&models.Project{}).
+		Where("reference = ?", ref).
+		Updates(p).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.WarnContext(ctx, "Project not found for update by reference", "projectRef", ref)
+			return ErrProjectNotFound
+		}
+		slog.ErrorContext(ctx, "Failed to update project by reference", "projectRef", ref, "error", err)
+		return errors.New("failed to update project by reference")
+	}
+	return nil
 }

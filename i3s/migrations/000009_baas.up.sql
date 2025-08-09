@@ -3,10 +3,10 @@ VALUES ('專案', 'Project');
 
 CREATE TABLE dbo.projects
 (
-    id               uuid        NOT NULL DEFAULT uuidv7(),
-    reference        VARCHAR(20) NOT NULL UNIQUE,
-    password_expired BOOLEAN              DEFAULT TRUE NOT NULL,
-    initialized_at boolean
+    id                  uuid        NOT NULL DEFAULT uuidv7(),
+    reference           VARCHAR(20) NOT NULL UNIQUE,
+    password_expired_at timestamptz NULL     DEFAULT CURRENT_TIMESTAMP,
+    initialized_at      timestamptz NULL,
     CONSTRAINT pk_dbo_projects PRIMARY KEY (id),
     CONSTRAINT fk_dbo_projects_id FOREIGN KEY (id) REFERENCES dbo.objects
 );
@@ -37,7 +37,8 @@ CREATE TABLE dbo.project_oauth_providers
     client_secret TEXT        NOT NULL,
     extra_config  jsonb       NULL,
     CONSTRAINT pk_dbo_project_idps PRIMARY KEY (id),
-    CONSTRAINT fk_dbo_project_idps_project_id FOREIGN KEY (project_id) REFERENCES dbo.projects (id) ON DELETE CASCADE
+    CONSTRAINT fk_dbo_project_idps_project_id FOREIGN KEY (project_id) REFERENCES dbo.projects (id) ON DELETE CASCADE,
+    CONSTRAINT uq_dbo_project_oauth_providers_name_project_id UNIQUE (name, project_id)
 );
 COMMENT ON TABLE dbo.project_oauth_providers IS 'project identity providers';
 COMMENT ON COLUMN dbo.project_oauth_providers.name IS 'identity provider name';
@@ -51,7 +52,9 @@ SELECT o.id,
        o.entity_id,
        p.reference,
        o.created_at,
-       o.updated_at
+       o.updated_at,
+       p.initialized_at,
+       p.password_expired_at
 FROM dbo.objects o,
      dbo.projects p
 WHERE o.id = p.id

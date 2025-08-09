@@ -6,9 +6,7 @@ import (
 	"baas-api/dto"
 	"baas-api/services"
 	"context"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/sse"
@@ -17,6 +15,7 @@ import (
 type ProjectController interface {
 	RegisterProjectAPIs(api huma.API)
 	getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error)
+	patchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error)
 	getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
 	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error)
@@ -38,45 +37,6 @@ func NewProjectController(config *config.Config, projectService services.Project
 
 func (c *projectController) RegisterProjectAPIs(api huma.API) {
 	authMiddleware := middlewares.NewAuthMiddleware(api, c.config)
-	sse.Register(api, huma.Operation{
-		OperationID: "test",
-		Method:      http.MethodPost,
-		Path:        "/test",
-		Summary:     "Test Endpoint",
-		Tags:        []string{"Test"},
-		// Middlewares: huma.Middlewares{authMiddleware, middlewares.TLSMiddleware},
-	}, map[string]any{
-		"project-status": dto.MessageEvent{},
-	}, func(ctx context.Context, in *struct{}, send sse.Sender) {
-		ch := make(chan any, 1)
-
-		go func() {
-			defer close(ch)
-
-			// Simulate some data being sent
-			for i := range 5 {
-				ch <- dto.MessageEvent{Message: "Test message " + fmt.Sprint(i)}
-				// Simulate a delay
-				time.Sleep(500 * time.Millisecond)
-			}
-		}()
-
-		for {
-			select {
-			case data, ok := <-ch:
-				if !ok {
-					// Channel was closed, so we are done.
-					return
-				}
-				if err := send.Data(data); err != nil {
-					return
-				}
-			case <-ctx.Done():
-				// Context was canceled, so we are done.
-				return
-			}
-		}
-	})
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-project-by-ref",
@@ -97,6 +57,16 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.createProject)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "patch-project-setting",
+		Method:      http.MethodPatch,
+		Path:        "/project/setting",
+		Summary:     "Patch Project Setting",
+		Description: "Update a project setting by its reference. The reference is a 20-character string.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.patchProjectSetting)
 
 	sse.Register(api, huma.Operation{
 		OperationID: "get-project-status",
@@ -153,6 +123,18 @@ func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProj
 		return nil, err
 	}
 	return &dto.GetProjectByRefOutput{Body: *out}, nil
+}
+
+func (c *projectController) patchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = c.projectService.PatchProjectSetting(ctx, in, session.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func (c *projectController) getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender) {

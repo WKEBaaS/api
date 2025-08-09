@@ -5,6 +5,7 @@ package kube
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,6 +14,73 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
+
+func (r *kubeProjectRepository) CreateIngressRoute(ctx context.Context, namespace string, ref string) error {
+	ingressRouteTCPYAML, err := os.Open("kube-files/project-ingressroute.yaml")
+	if err != nil {
+		slog.Error("Failed to open IngressRoute YAML file", "error", err)
+		return errors.New("failed to open IngressRoute YAML file")
+	}
+	defer ingressRouteTCPYAML.Close()
+
+	ingressRouteUnstructured := &unstructured.Unstructured{}
+	decoder := yaml.NewYAMLOrJSONDecoder(ingressRouteTCPYAML, 1024)
+	if err := decoder.Decode(ingressRouteUnstructured); err != nil {
+		slog.Error("Failed to decode IngressRoute YAML", "error", err)
+		return errors.New("failed to decode IngressRoute YAML")
+	}
+
+	// set metadata
+	ingressRouteName := r.GenAPIIngressRouteName(ref)
+	ingressRouteUnstructured.SetName(ingressRouteName)
+	ingressRouteUnstructured.SetNamespace(namespace)
+
+	// set spec.routes[0]
+	projectHost := r.GenProjectHost(ref)
+	serviceName := r.GenAPIServiceName(ref)
+	unstructured.SetNestedSlice(ingressRouteUnstructured.Object, []any{
+		map[string]any{
+			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/auth`)", projectHost),
+			"services": []any{
+				map[string]any{
+					"name": serviceName,
+					"port": int64(3000),
+				},
+			},
+		},
+	}, "spec", "routes")
+
+	// set spec.tls.secretName
+	if err := unstructured.SetNestedField(ingressRouteUnstructured.Object, r.config.Kube.Project.TLSSecretName, "spec", "tls", "secretName"); err != nil {
+		slog.Error("Failed to set TLS secret name in IngressRoute spec", "error", err)
+		return errors.New("failed to set TLS secret name in IngressRoute spec")
+	}
+
+	// 使用 dynamicClient 創建資源
+	_, err = r.dynamicClient.Resource(ingressRouteGVR).
+		Namespace(namespace).
+		Create(ctx, ingressRouteUnstructured, metav1.CreateOptions{})
+	if err != nil {
+		slog.Error("Failed to create IngressRoute", "error", err)
+		return errors.New("failed to create IngressRoute")
+	}
+
+	return nil
+}
+
+func (r *kubeProjectRepository) DeleteIngressRoute(ctx context.Context, namespace string, ref string) error {
+	// 使用 dynamicClient 刪除資源
+	target := r.GenAPIIngressRouteName(ref)
+	err := r.dynamicClient.Resource(ingressRouteGVR).
+		Namespace(namespace).
+		Delete(ctx, target, metav1.DeleteOptions{})
+	if err != nil {
+		slog.Error("Failed to delete IngressRoute", "error", err)
+		return errors.New("failed to delete IngressRoute")
+	}
+
+	return nil
+}
 
 func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, namespace string, ref string) error {
 	ingressRouteTCPYAML, err := os.Open("kube-files/project-ingressroutetcp.yaml")
@@ -30,15 +98,16 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 	}
 
 	// set metadata
-	ingressRouteTCPUnstructured.SetName(fmt.Sprintf("%s-ingressroutetcp", ref))
+	dbIngressRouteTCPName := r.GenDBIngressRouteTCPName(ref)
+	ingressRouteTCPUnstructured.SetName(dbIngressRouteTCPName)
 	ingressRouteTCPUnstructured.SetNamespace(namespace)
 
 	// set spec.routes[0]
-	projectHostSNI := fmt.Sprintf("HostSNI(`%s.%s`)", ref, r.config.App.Host)
+	projectHost := r.GenProjectHost(ref)
 	serviceName := fmt.Sprintf("%s-rw", ref)
 	unstructured.SetNestedSlice(ingressRouteTCPUnstructured.Object, []any{
 		map[string]any{
-			"match": projectHostSNI,
+			"match": fmt.Sprintf("Host(`%s`))", projectHost),
 			"services": []any{
 				map[string]any{
 					"name": serviceName,
@@ -67,9 +136,10 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 
 func (r *kubeProjectRepository) DeleteIngressRouteTCP(ctx context.Context, namespace string, ref string) error {
 	// 使用 dynamicClient 刪除資源
+	target := r.GenDBIngressRouteTCPName(ref)
 	err := r.dynamicClient.Resource(ingressRouteTCPGVR).
 		Namespace(namespace).
-		Delete(ctx, fmt.Sprintf("%s-ingressroutetcp", ref), metav1.DeleteOptions{})
+		Delete(ctx, target, metav1.DeleteOptions{})
 	if err != nil {
 		slog.Error("Failed to delete IngressRouteTCP", "error", err)
 		return ErrFailedToDeleteIngressRouteTCP

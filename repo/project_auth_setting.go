@@ -20,9 +20,11 @@ var (
 type ProjectAuthSettingRepository interface {
 	Create(ctx context.Context, s *models.ProjectAuthSettings) error
 	FindByProjectID(ctx context.Context, projectID string) (*models.ProjectAuthSettings, error)
+	Update(ctx context.Context, s *models.ProjectAuthSettings) error
 	DeleteByProjectID(ctx context.Context, projectID string) error
 	CreateOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) (*string, error)
 	FindAllOAuthProviders(ctx context.Context, projectID string) ([]*models.ProjectOAuthProvider, error)
+	UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) error
 }
 
 type projectAuthSettingRepository struct {
@@ -56,6 +58,14 @@ func (r *projectAuthSettingRepository) FindByProjectID(ctx context.Context, proj
 	return &setting, nil
 }
 
+func (r *projectAuthSettingRepository) Update(ctx context.Context, s *models.ProjectAuthSettings) error {
+	if err := r.db.WithContext(ctx).Model(&models.ProjectAuthSettings{}).Where("project_id = ?", s.ProjectID).Updates(s).Error; err != nil {
+		slog.ErrorContext(ctx, "Failed to update project auth setting", "error", err)
+		return ErrDatabaseError
+	}
+	return nil
+}
+
 func (r *projectAuthSettingRepository) DeleteByProjectID(ctx context.Context, projectID string) error {
 	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).Delete(&models.ProjectAuthSettings{}).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to delete project auth setting", "error", err)
@@ -79,4 +89,30 @@ func (r *projectAuthSettingRepository) FindAllOAuthProviders(ctx context.Context
 		return nil, ErrDatabaseError
 	}
 	return providers, nil
+}
+
+func (r *projectAuthSettingRepository) UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) error {
+	var existingProvider models.ProjectOAuthProvider
+	err := r.db.WithContext(ctx).Where("project_id = ? AND name = ?", provider.ProjectID, provider.Name).First(&existingProvider).Error
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		slog.ErrorContext(ctx, "Failed to find existing OAuth provider", "error", err)
+		return ErrDatabaseError
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Create new provider
+		if _, err := r.CreateOAuthProvider(ctx, provider); err != nil {
+			return err
+		}
+	} else {
+		// Update existing provider
+		provider.ID = existingProvider.ID // Ensure we use the existing ID
+		if err := r.db.WithContext(ctx).Save(provider).Error; err != nil {
+			slog.ErrorContext(ctx, "Failed to update OAuth provider", "error", err)
+			return ErrDatabaseError
+		}
+	}
+
+	return nil
 }

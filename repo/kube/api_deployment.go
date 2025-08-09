@@ -3,6 +3,7 @@ package kube
 import (
 	"baas-api/utils"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,10 +14,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/yaml"
 )
 
-type CreateAPIDeploymentOption struct {
+type APIDeploymentOption struct {
 	Namespace        string
 	Ref              string
 	BetterAuthSecret string
@@ -39,36 +39,36 @@ type OAuthProvider struct {
 	ClientSecret string
 }
 
-func NewAPIDeploymentOption() *CreateAPIDeploymentOption {
-	return &CreateAPIDeploymentOption{}
+func NewAPIDeploymentOption() *APIDeploymentOption {
+	return &APIDeploymentOption{}
 }
 
-func (o *CreateAPIDeploymentOption) WithNamespace(namespace string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithNamespace(namespace string) *APIDeploymentOption {
 	o.Namespace = namespace
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithRef(ref string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithRef(ref string) *APIDeploymentOption {
 	o.Ref = ref
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithTrustedOrigins(origins []string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithTrustedOrigins(origins []string) *APIDeploymentOption {
 	o.TrustedOrigins = origins
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithEmailAndPasswordAuth(enabled bool) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithEmailAndPasswordAuth(enabled bool) *APIDeploymentOption {
 	o.Auth.EmailAndPasswordEnabled = enabled
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithBetterAuthSecret(secret string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithBetterAuthSecret(secret string) *APIDeploymentOption {
 	o.BetterAuthSecret = secret
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithGoogle(clientID, clientSecret string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithGoogle(clientID, clientSecret string) *APIDeploymentOption {
 	o.Auth.Google = &OAuthProvider{
 		Enabled:      true,
 		ClientID:     clientID,
@@ -77,7 +77,7 @@ func (o *CreateAPIDeploymentOption) WithGoogle(clientID, clientSecret string) *C
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithGitHub(clientID, clientSecret string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithGitHub(clientID, clientSecret string) *APIDeploymentOption {
 	o.Auth.GitHub = &OAuthProvider{
 		Enabled:      true,
 		ClientID:     clientID,
@@ -86,7 +86,7 @@ func (o *CreateAPIDeploymentOption) WithGitHub(clientID, clientSecret string) *C
 	return o
 }
 
-func (o *CreateAPIDeploymentOption) WithDiscord(clientID, clientSecret string) *CreateAPIDeploymentOption {
+func (o *APIDeploymentOption) WithDiscord(clientID, clientSecret string) *APIDeploymentOption {
 	o.Auth.Discord = &OAuthProvider{
 		Enabled:      true,
 		ClientID:     clientID,
@@ -95,7 +95,7 @@ func (o *CreateAPIDeploymentOption) WithDiscord(clientID, clientSecret string) *
 	return o
 }
 
-func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *CreateAPIDeploymentOption) error {
+func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *APIDeploymentOption) error {
 	// Build environment variables dynamically
 	envVars := []corev1.EnvVar{
 		{
@@ -152,7 +152,8 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *Cr
 		)
 	}
 
-	deploymentName := fmt.Sprintf("%s-api", opt.Ref)
+	deploymentName := r.GenAPIDeploymentName(opt.Ref)
+	authContainerName := fmt.Sprintf("%s-auth", opt.Ref)
 	// Create the deployment object
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -175,7 +176,7 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *Cr
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  deploymentName,
+							Name:  authContainerName,
 							Image: "ghcr.io/wkebaas/project-auth:v0.0.12",
 							Ports: []corev1.ContainerPort{
 								{
@@ -200,10 +201,9 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *Cr
 	return nil
 }
 
-func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *CreateAPIDeploymentOption) error {
-	deploymentName := fmt.Sprintf("%s-api", ref)
+func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error {
+	deploymentName := r.GenAPIDeploymentName(ref)
 	envVars := []corev1.EnvVar{}
-	payload := &appsv1.Deployment{}
 
 	if opt.BetterAuthSecret != "" {
 		envVars = append(envVars, corev1.EnvVar{
@@ -245,16 +245,25 @@ func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespac
 		)
 	}
 
-	payload.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Name: deploymentName,
-			Env:  envVars,
+	// Prepare JSON merge patch payload instead of YAML to avoid "invalid character" errors
+	payload := map[string]any{
+		"spec": map[string]any{
+			"template": map[string]any{
+				"spec": map[string]any{
+					"containers": []map[string]any{
+						{
+							"name": deploymentName,
+							"env":  envVars,
+						},
+					},
+				},
+			},
 		},
 	}
-	data, err := yaml.Marshal(payload)
+	data, err := json.Marshal(payload)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to marshal deployment payload", "error", err)
-		return fmt.Errorf("failed to marshal deployment payload")
+		slog.ErrorContext(ctx, "Failed to marshal patch data", "error", err)
+		return errors.New("failed to marshal patch data")
 	}
 
 	// Patch the deployment
@@ -274,7 +283,7 @@ func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespac
 }
 
 func (r *kubeProjectRepository) DeleteAPIDeployment(ctx context.Context, namespace string, ref string) error {
-	deploymentName := fmt.Sprintf("%s-api", ref)
+	deploymentName := r.GenAPIDeploymentName(ref)
 
 	// Delete the deployment
 	err := r.clientset.AppsV1().Deployments(namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})

@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/samber/lo"
 )
 
 type ProjectService interface {
 	CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error)
 	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
+	PatchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
 	GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error
@@ -97,13 +99,6 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
-	err = s.repo.kubeProject.CreateIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
-	if err != nil {
-		return nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
-	})
 	err = s.repo.kubeProject.CreateAPIDeployment(ctx,
 		kube.NewAPIDeploymentOption().
 			WithNamespace(s.config.Kube.Project.Namespace).
@@ -116,6 +111,30 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
+
+	err = s.repo.kubeProject.CreateAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
+
+	err = s.repo.kubeProject.CreateIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
+	})
+
+	err = s.repo.kubeProject.CreateIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
 	success = true // Mark as successful if we reach here without errors
@@ -135,36 +154,77 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		return nil, huma.Error401Unauthorized("Unauthorized")
 	}
 
+	var errors []error
+
 	err = s.repo.kubeProject.DeleteCluster(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
-		return nil, err
+		errors = append(errors, err)
 	}
 
 	err = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
-		// If the database deletion fails, we should not proceed with deleting the project entry
-		return nil, err
+		errors = append(errors, err)
 	}
 
 	err = s.repo.project.DeleteByRef(ctx, in.Reference)
 	if err != nil {
-		return nil, err
+		errors = append(errors, err)
 	}
 
 	err = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
-		return nil, err
+		errors = append(errors, err)
 	}
 
 	err = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
-		return nil, err
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return nil, huma.Error500InternalServerError("Failed to delete project resources", errors...)
 	}
 
 	out := &dto.DeleteProjectByRefOutput{}
 	out.Body.Success = true
 
 	return out, nil
+}
+
+func (s *projectService) PatchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error {
+	project, err := s.repo.project.FindByRef(ctx, in.Body.Ref)
+	if err != nil {
+		return err
+	}
+	if project.OwnerID != userID {
+		return huma.Error401Unauthorized("Unauthorized")
+	}
+
+	opt := kube.NewAPIDeploymentOption()
+	if in.Body.TrustedOrigins != nil {
+		opt.WithTrustedOrigins(in.Body.TrustedOrigins)
+	}
+	if in.Body.Auth != nil {
+		if in.Body.Auth.EmailAndPasswordEnabled != nil {
+			opt.WithEmailAndPasswordAuth(*in.Body.Auth.EmailAndPasswordEnabled)
+		}
+		if in.Body.Auth.Google != nil && in.Body.Auth.Google.Enabled {
+			opt.WithGoogle(in.Body.Auth.Google.ClientID, in.Body.Auth.Google.ClientSecret)
+		}
+		if in.Body.Auth.GitHub != nil && in.Body.Auth.GitHub.Enabled {
+			opt.WithGitHub(in.Body.Auth.GitHub.ClientID, in.Body.Auth.GitHub.ClientSecret)
+		}
+		if in.Body.Auth.Discord != nil && in.Body.Auth.Discord.Enabled {
+			opt.WithDiscord(in.Body.Auth.Discord.ClientID, in.Body.Auth.Discord.ClientSecret)
+		}
+	}
+
+	err = s.repo.kubeProject.PatchAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *projectService) GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error) {
@@ -183,6 +243,9 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 	}
 	if project.OwnerID != userID {
 		return huma.Error401Unauthorized("Unauthorized")
+	}
+	if project.InitializedAt != nil {
+		return huma.Error400BadRequest("Project already initialized")
 	}
 
 	totalStep := 4
@@ -203,6 +266,9 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 		case "Waiting for the instances to become active":
 			c <- dto.ProjectStatusEvent{Message: "Postgres Waiting for the instances to become active", Step: 3, TotalStep: totalStep}
 		case "Cluster in healthy state":
+			s.repo.project.UpdateByRef(ctx, ref, &models.Project{
+				InitializedAt: lo.ToPtr(time.Now()),
+			})
 			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is ready.", Step: 4, TotalStep: totalStep}
 			return nil
 		default:
