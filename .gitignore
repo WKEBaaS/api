@@ -2,3 +2,4 @@
 *.pem
 *.jwk
 *.jwk.pub
+/config.yaml

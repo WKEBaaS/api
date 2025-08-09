@@ -1,0 +1,69 @@
+// Package config BaaS API Config
+package config
+
+import (
+	"net/url"
+	"strings"
+
+	// "github.com/go-viper/mapstructure/v2"
+	"github.com/go-viper/mapstructure/v2"
+	_ "github.com/joho/godotenv/autoload"
+	"github.com/spf13/viper"
+)
+
+type AppConfig struct {
+	Port           string
+	Host           string
+	TrustedOrigins []string
+	ExternalDomain string
+	ExternalSecure bool
+}
+
+type DatabaseConfig struct {
+	URL string
+}
+
+type AuthConfig struct {
+	URL *url.URL
+}
+
+type KubeConfig struct {
+	ConfigPath string
+	Project    struct {
+		Namespace     string
+		TLSSecretName string
+	}
+}
+
+type Config struct {
+	App      AppConfig
+	Database DatabaseConfig
+	Auth     AuthConfig
+	Kube     KubeConfig
+}
+
+func LoadConfig() (*Config, error) {
+	c := &Config{}
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("config")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if err := viper.ReadInConfig(); err != nil {
+		return c, err
+	}
+
+	err := viper.Unmarshal(&c, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToURLHookFunc(),
+		),
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
