@@ -77,3 +77,30 @@ type ResetDatabasePasswordOutput struct {
 		Success bool `json:"success" doc:"Indicates if the password was successfully reset"`
 	}
 }
+
+type GetProjectSettingsInput struct {
+	Ref string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+}
+
+type ProjectSettingsAuth struct {
+	EmailAndPasswordEnabled bool                      `json:"emailAndPasswordEnabled" doc:"Enable email and password authentication"`
+	Google                  *ProjectOAuthProviderInfo `json:"google,omitempty" doc:"Google OAuth provider settings"`
+	GitHub                  *ProjectOAuthProviderInfo `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
+	Discord                 *ProjectOAuthProviderInfo `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
+}
+
+type ProjectOAuthProviderInfo struct {
+	Enabled      bool   `json:"enabled" doc:"Whether this OAuth provider is enabled"`
+	ClientID     string `json:"clientId,omitempty" doc:"OAuth Client ID"`
+	ClientSecret string `json:"clientSecret,omitempty" doc:"OAuth Client Secret"`
+}
+
+type GetProjectSettingsOutput struct {
+	Body struct {
+		ID             string              `json:"id" doc:"Project ID"`
+		TrustedOrigins []string            `json:"trustedOrigins" doc:"List of trusted origins for CORS"`
+		Auth           ProjectSettingsAuth `json:"auth" doc:"Authentication settings for the project"`
+		CreatedAt      string              `json:"createdAt" doc:"Project creation timestamp"`
+		UpdatedAt      string              `json:"updatedAt" doc:"Project last update timestamp"`
+	}
+}

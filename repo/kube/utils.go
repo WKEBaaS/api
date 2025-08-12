@@ -4,18 +4,22 @@ func (r *kubeProjectRepository) GenProjectHost(ref string) string {
 	return ref + "." + r.config.App.ExternalDomain
 }
 
-func (*kubeProjectRepository) GenAPIServiceName(ref string) string {
-	return ref + "-api-service"
+func (*kubeProjectRepository) GetAPIServiceName(ref string) string {
+	return ref + "-api"
 }
 
-func (*kubeProjectRepository) GenAPIDeploymentName(ref string) string {
-	return ref + "-api-deployment"
+func (*kubeProjectRepository) GetAPIDeploymentName(ref string) string {
+	return ref + "-api"
 }
 
-func (*kubeProjectRepository) GenAPIIngressRouteName(ref string) string {
-	return ref + "-api-ingress"
+func (*kubeProjectRepository) GetAPIAuthContainerName(ref string) string {
+	return ref + "-auth"
 }
 
-func (*kubeProjectRepository) GenDBIngressRouteTCPName(ref string) string {
-	return ref + "-db-ingress-tcp"
+func (*kubeProjectRepository) GetAPIIngressRouteName(ref string) string {
+	return ref + "-api"
+}
+
+func (*kubeProjectRepository) GetDBIngressRouteTCPName(ref string) string {
+	return ref + "-db-tcp"
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/samber/lo"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -23,6 +24,7 @@ type ProjectAuthSettingRepository interface {
 	Update(ctx context.Context, s *models.ProjectAuthSettings) error
 	DeleteByProjectID(ctx context.Context, projectID string) error
 	CreateOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) (*string, error)
+	UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectOAuthProvider) error
 	FindAllOAuthProviders(ctx context.Context, projectID string) ([]*models.ProjectOAuthProvider, error)
 	UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) error
 }
@@ -114,5 +116,27 @@ func (r *projectAuthSettingRepository) UpdateOrInsertOAuthProvider(ctx context.C
 		}
 	}
 
+	return nil
+}
+
+func (r *projectAuthSettingRepository) UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectOAuthProvider) error {
+	// FIX: add debug here, since gorm will raise a weird error that insert with  all value null/empty
+	err := r.db.Debug().WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "project_id"},
+			{Name: "name"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"enabled",
+			"client_id",
+			"client_secret",
+			"extra_config",
+			"updated_at",
+		}),
+	}).Create(providers).Error
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to upsert OAuth providers", "error", err)
+		return ErrDatabaseError
+	}
 	return nil
 }

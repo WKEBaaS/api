@@ -12,8 +12,8 @@ import (
 )
 
 func (r *kubeProjectRepository) CreateAPIService(ctx context.Context, namespace string, ref string) error {
-	serviceName := r.GenAPIServiceName(ref)
-	deploymentName := r.GenAPIDeploymentName(ref)
+	serviceName := r.GetAPIServiceName(ref)
+	deploymentName := r.GetAPIDeploymentName(ref)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,

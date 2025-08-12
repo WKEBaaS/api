@@ -21,6 +21,7 @@ type ProjectService interface {
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
 	GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error
+	GetProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput, userID string) (*dto.GetProjectSettingsOutput, error)
 	ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error)
 }
 
@@ -100,9 +101,9 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	})
 
 	err = s.repo.kubeProject.CreateAPIDeployment(ctx,
+		*ref,
 		kube.NewAPIDeploymentOption().
 			WithNamespace(s.config.Kube.Project.Namespace).
-			WithRef(*ref).
 			WithBetterAuthSecret(projectAuthSetting.Secret).
 			WithEmailAndPasswordAuth(projectAuthSetting.EmailAndPasswordEnabled),
 	)
@@ -200,39 +201,82 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		return huma.Error401Unauthorized("Unauthorized")
 	}
 
-	if in.Body.Name != nil || in.Body.Description != nil {
-		s.repo.project.UpdateByRef(ctx, in.Body.Ref, &models.Project{}, &models.Object{
-			UpdatedAt:          time.Now(),
-			ChineseName:        in.Body.Name,
-			ChineseDescription: in.Body.Description,
-		})
-	}
-
 	if in.Body.TrustedOrigins == nil && in.Body.Auth == nil {
 		return nil // No changes to apply
 	}
 
+	objectPayload := &models.Object{}
+	projectPayload := &models.Project{}
+	needPatchDeployment := false
+
+	if in.Body.Name != nil || in.Body.Description != nil {
+		objectPayload.ChineseName = in.Body.Name
+		objectPayload.EnglishName = in.Body.Name
+		objectPayload.UpdatedAt = time.Now()
+	}
+
 	opt := kube.NewAPIDeploymentOption()
 	if in.Body.TrustedOrigins != nil {
+		needPatchDeployment = true
 		opt.WithTrustedOrigins(in.Body.TrustedOrigins)
 	}
 
 	if in.Body.Auth != nil {
+		oauthProviders := []*models.ProjectOAuthProvider{}
+		needPatchDeployment = true
 		if in.Body.Auth.EmailAndPasswordEnabled != nil {
 			opt.WithEmailAndPasswordAuth(*in.Body.Auth.EmailAndPasswordEnabled)
+			s.repo.projectAuthSetting.CreateOAuthProvider(ctx, &models.ProjectOAuthProvider{})
 		}
-		if in.Body.Auth.Google != nil && in.Body.Auth.Google.Enabled {
+		if in.Body.Auth.Google != nil {
 			opt.WithGoogle(in.Body.Auth.Google.ClientID, in.Body.Auth.Google.ClientSecret)
+			oauthProviders = append(oauthProviders, &models.ProjectOAuthProvider{
+				Name:         "google",
+				ProjectID:    project.ID,
+				Enabled:      in.Body.Auth.Google.Enabled,
+				ClientID:     in.Body.Auth.Google.ClientID,
+				ClientSecret: in.Body.Auth.Google.ClientSecret,
+				UpdatedAt:    time.Now(),
+			})
 		}
-		if in.Body.Auth.GitHub != nil && in.Body.Auth.GitHub.Enabled {
+		if in.Body.Auth.GitHub != nil {
 			opt.WithGitHub(in.Body.Auth.GitHub.ClientID, in.Body.Auth.GitHub.ClientSecret)
+			oauthProviders = append(oauthProviders, &models.ProjectOAuthProvider{
+				Name:         "github",
+				ProjectID:    project.ID,
+				Enabled:      in.Body.Auth.GitHub.Enabled,
+				ClientID:     in.Body.Auth.GitHub.ClientID,
+				ClientSecret: in.Body.Auth.GitHub.ClientSecret,
+				UpdatedAt:    time.Now(),
+			})
 		}
-		if in.Body.Auth.Discord != nil && in.Body.Auth.Discord.Enabled {
+		if in.Body.Auth.Discord != nil {
 			opt.WithDiscord(in.Body.Auth.Discord.ClientID, in.Body.Auth.Discord.ClientSecret)
+			oauthProviders = append(oauthProviders, &models.ProjectOAuthProvider{
+				Name:         "discord",
+				ProjectID:    project.ID,
+				Enabled:      in.Body.Auth.Discord.Enabled,
+				ClientID:     in.Body.Auth.Discord.ClientID,
+				ClientSecret: in.Body.Auth.Discord.ClientSecret,
+				UpdatedAt:    time.Now(),
+			})
+		}
+
+		err = s.repo.projectAuthSetting.UpsertOAuthProviders(ctx, oauthProviders)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	if needPatchDeployment {
+		err = s.repo.kubeProject.PatchAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
+		if err != nil {
+			return err
 		}
 	}
 
-	err = s.repo.kubeProject.PatchAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
+	err = s.repo.project.UpdateByRef(ctx, in.Body.Ref, projectPayload, objectPayload)
 	if err != nil {
 		return err
 	}
@@ -304,6 +348,53 @@ func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID st
 	}
 
 	return project, nil
+}
+
+func (s *projectService) GetProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput, userID string) (*dto.GetProjectSettingsOutput, error) {
+	project, err := s.repo.project.FindByRef(ctx, in.Ref)
+	if err != nil {
+		return nil, err
+	}
+	if project.OwnerID != userID {
+		return nil, huma.Error401Unauthorized("Unauthorized")
+	}
+
+	authSettings, err := s.repo.projectAuthSetting.FindByProjectID(ctx, project.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	oauthProviders, err := s.repo.projectAuthSetting.FindAllOAuthProviders(ctx, project.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &dto.GetProjectSettingsOutput{}
+	out.Body.ID = project.ID
+	out.Body.TrustedOrigins = authSettings.TrustedOrigins
+	out.Body.CreatedAt = project.CreatedAt.Format(time.RFC3339)
+	out.Body.UpdatedAt = project.UpdatedAt.Format(time.RFC3339)
+
+	out.Body.Auth.EmailAndPasswordEnabled = authSettings.EmailAndPasswordEnabled
+
+	for _, provider := range oauthProviders {
+		providerInfo := &dto.ProjectOAuthProviderInfo{
+			Enabled:      provider.Enabled,
+			ClientID:     provider.ClientID,
+			ClientSecret: provider.ClientSecret,
+		}
+
+		switch provider.Name {
+		case "google":
+			out.Body.Auth.Google = providerInfo
+		case "github":
+			out.Body.Auth.GitHub = providerInfo
+		case "discord":
+			out.Body.Auth.Discord = providerInfo
+		}
+	}
+
+	return out, nil
 }
 
 func (s *projectService) ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error) {

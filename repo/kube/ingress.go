@@ -31,13 +31,13 @@ func (r *kubeProjectRepository) CreateIngressRoute(ctx context.Context, namespac
 	}
 
 	// set metadata
-	ingressRouteName := r.GenAPIIngressRouteName(ref)
+	ingressRouteName := r.GetAPIIngressRouteName(ref)
 	ingressRouteUnstructured.SetName(ingressRouteName)
 	ingressRouteUnstructured.SetNamespace(namespace)
 
 	// set spec.routes[0]
 	projectHost := r.GenProjectHost(ref)
-	serviceName := r.GenAPIServiceName(ref)
+	serviceName := r.GetAPIServiceName(ref)
 	unstructured.SetNestedSlice(ingressRouteUnstructured.Object, []any{
 		map[string]any{
 			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/auth`)", projectHost),
@@ -70,7 +70,7 @@ func (r *kubeProjectRepository) CreateIngressRoute(ctx context.Context, namespac
 
 func (r *kubeProjectRepository) DeleteIngressRoute(ctx context.Context, namespace string, ref string) error {
 	// 使用 dynamicClient 刪除資源
-	target := r.GenAPIIngressRouteName(ref)
+	target := r.GetAPIIngressRouteName(ref)
 	err := r.dynamicClient.Resource(ingressRouteGVR).
 		Namespace(namespace).
 		Delete(ctx, target, metav1.DeleteOptions{})
@@ -98,7 +98,7 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 	}
 
 	// set metadata
-	dbIngressRouteTCPName := r.GenDBIngressRouteTCPName(ref)
+	dbIngressRouteTCPName := r.GetDBIngressRouteTCPName(ref)
 	ingressRouteTCPUnstructured.SetName(dbIngressRouteTCPName)
 	ingressRouteTCPUnstructured.SetNamespace(namespace)
 
@@ -136,7 +136,7 @@ func (r *kubeProjectRepository) CreateIngressRouteTCP(ctx context.Context, names
 
 func (r *kubeProjectRepository) DeleteIngressRouteTCP(ctx context.Context, namespace string, ref string) error {
 	// 使用 dynamicClient 刪除資源
-	target := r.GenDBIngressRouteTCPName(ref)
+	target := r.GetDBIngressRouteTCPName(ref)
 	err := r.dynamicClient.Resource(ingressRouteTCPGVR).
 		Namespace(namespace).
 		Delete(ctx, target, metav1.DeleteOptions{})

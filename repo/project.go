@@ -274,28 +274,33 @@ func (r *projectRepository) FindAllByUserID(ctx context.Context, userID string) 
 
 func (r *projectRepository) UpdateByRef(ctx context.Context, ref string, project any, object any) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var updatedProject models.Project
-		err := tx.Model(&updatedProject).
-			Where("reference = ?", ref).
-			Updates(project).Error
-		if err != nil {
+		var p models.Project
+		if err := tx.Select("id").First(&p, "reference = ?", ref).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				slog.WarnContext(ctx, "Project not found for update by reference", "projectRef", ref)
 				return ErrProjectNotFound
 			}
+			slog.ErrorContext(ctx, "Failed to find project by reference for update", "projectRef", ref, "error", err)
+			return errors.New("failed to find project by reference for update")
+		}
+
+		err := tx.Model(&models.Project{}).
+			Where("reference = ?", ref).
+			Updates(project).Error
+		if err != nil {
 			slog.ErrorContext(ctx, "Failed to update project by reference", "projectRef", ref, "error", err)
 			return errors.New("failed to update project by reference")
 		}
 
 		err = tx.Model(&models.Object{}).
-			Where("id = ?", updatedProject.ID).
+			Where("id = ?", p.ID).
 			Updates(object).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				slog.WarnContext(ctx, "Associated object not found for update by project reference", "objectID", updatedProject.ID, "projectRef", ref)
+				slog.WarnContext(ctx, "Associated object not found for update by project reference", "objectID", p.ID, "projectRef", ref)
 				return ErrProjectNotFound
 			}
-			slog.ErrorContext(ctx, "Failed to update associated object by project reference", "objectID", updatedProject.ID, "projectRef", ref, "error", err)
+			slog.ErrorContext(ctx, "Failed to update associated object by project reference", "objectID", p.ID, "projectRef", ref, "error", err)
 			return errors.New("failed to update associated object by project reference")
 		}
 

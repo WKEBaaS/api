@@ -17,6 +17,7 @@ type ProjectController interface {
 	getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error)
 	patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error)
 	getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender)
+	getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
 	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error)
 	getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error)
@@ -67,6 +68,16 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.patchProjectSettings)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-project-settings",
+		Method:      "GET",
+		Path:        "/project/settings/by-ref",
+		Summary:     "Get Project Settings by Reference",
+		Description: "Retrieve project settings including authentication and OAuth provider settings by reference.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.getProjectSettings)
 
 	sse.Register(api, huma.Operation{
 		OperationID: "get-project-status",
@@ -135,6 +146,18 @@ func (c *projectController) patchProjectSettings(ctx context.Context, in *dto.Pa
 		return nil, err
 	}
 	return nil, nil
+}
+
+func (c *projectController) getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out, err := c.projectService.GetProjectSettings(ctx, in, session.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *projectController) getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender) {

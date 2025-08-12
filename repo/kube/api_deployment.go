@@ -18,7 +18,6 @@ import (
 
 type APIDeploymentOption struct {
 	Namespace        string
-	Ref              string
 	BetterAuthSecret string
 	TrustedOrigins   []string
 
@@ -45,11 +44,6 @@ func NewAPIDeploymentOption() *APIDeploymentOption {
 
 func (o *APIDeploymentOption) WithNamespace(namespace string) *APIDeploymentOption {
 	o.Namespace = namespace
-	return o
-}
-
-func (o *APIDeploymentOption) WithRef(ref string) *APIDeploymentOption {
-	o.Ref = ref
 	return o
 }
 
@@ -95,12 +89,12 @@ func (o *APIDeploymentOption) WithDiscord(clientID, clientSecret string) *APIDep
 	return o
 }
 
-func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *APIDeploymentOption) error {
+func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error {
 	// Build environment variables dynamically
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "BETTER_AUTH_URL",
-			Value: fmt.Sprintf("https://%s.%s", opt.Ref, r.config.App.ExternalDomain),
+			Value: fmt.Sprintf("https://%s.%s", ref, r.config.App.ExternalDomain),
 		},
 		{
 			Name:  "BETTER_AUTH_SECRET",
@@ -119,7 +113,7 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *AP
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: fmt.Sprintf("%s-app", opt.Ref),
+						Name: fmt.Sprintf("%s-app", ref),
 					},
 					Key: "uri",
 				},
@@ -152,8 +146,8 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *AP
 		)
 	}
 
-	deploymentName := r.GenAPIDeploymentName(opt.Ref)
-	authContainerName := fmt.Sprintf("%s-auth", opt.Ref)
+	deploymentName := r.GetAPIDeploymentName(ref)
+	authContainerName := r.GetAPIAuthContainerName(ref)
 	// Create the deployment object
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -202,7 +196,8 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, opt *AP
 }
 
 func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error {
-	deploymentName := r.GenAPIDeploymentName(ref)
+	deploymentName := r.GetAPIDeploymentName(ref)
+	authContainerName := r.GetAPIAuthContainerName(ref)
 	envVars := []corev1.EnvVar{}
 
 	if opt.BetterAuthSecret != "" {
@@ -252,7 +247,7 @@ func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespac
 				"spec": map[string]any{
 					"containers": []map[string]any{
 						{
-							"name": deploymentName,
+							"name": authContainerName,
 							"env":  envVars,
 						},
 					},
@@ -283,7 +278,7 @@ func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespac
 }
 
 func (r *kubeProjectRepository) DeleteAPIDeployment(ctx context.Context, namespace string, ref string) error {
-	deploymentName := r.GenAPIDeploymentName(ref)
+	deploymentName := r.GetAPIDeploymentName(ref)
 
 	// Delete the deployment
 	err := r.clientset.AppsV1().Deployments(namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})

@@ -25,7 +25,7 @@ type KubeProjectRepository interface {
 	ResetDatabasePassword(ctx context.Context, namespace string, ref string, password string) error
 
 	// BaaS Project API
-	CreateAPIDeployment(ctx context.Context, opt *APIDeploymentOption) error
+	CreateAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error
 	DeleteAPIDeployment(ctx context.Context, namespace string, ref string) error
 	PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error
 	CreateAPIService(ctx context.Context, namespace string, ref string) error

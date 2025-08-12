@@ -49,12 +49,12 @@ type ProjectOAuthProvider struct {
 	ID           string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
 	Enabled      bool           `gorm:"not null;default:false" json:"enabled"`
 	Name         string         `gorm:"type:varchar(50);not null" json:"name"`
-	ProjectID    string         `gorm:"type:uuid;not null" json:"project_id"`
+	ProjectID    string         `gorm:"column:project_id;type:uuid;not null" json:"project_id"` // 加上 column:project_id
 	CreatedAt    time.Time      `gorm:"not null;default:current_timestamp" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"not null;default:current_timestamp" json:"updated_at"`
-	ClientID     string         `gorm:"type:text;not null" json:"client_id"`
-	ClientSecret string         `gorm:"type:text;not null" json:"client_secret"`
-	ExtraConfig  datatypes.JSON `gorm:"type:jsonb" json:"extra_config"`
+	ClientID     string         `gorm:"column:client_id;type:text;not null" json:"client_id"`         // 加上 column:client_id
+	ClientSecret string         `gorm:"column:client_secret;type:text;not null" json:"client_secret"` // 加上 column:client_secret
+	ExtraConfig  datatypes.JSON `gorm:"column:extra_config;type:jsonb" json:"extra_config"`           // 加上 column:extra_config
 }
 
 // TableName specifies the table name for ProjectOAuthProvider
