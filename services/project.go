@@ -205,6 +205,7 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		return nil // No changes to apply
 	}
 
+	oauthProviders := []*models.ProjectOAuthProvider{}
 	objectPayload := &models.Object{}
 	projectPayload := &models.Project{}
 	needPatchDeployment := false
@@ -222,11 +223,9 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 	}
 
 	if in.Body.Auth != nil {
-		oauthProviders := []*models.ProjectOAuthProvider{}
 		needPatchDeployment = true
 		if in.Body.Auth.EmailAndPasswordEnabled != nil {
 			opt.WithEmailAndPasswordAuth(*in.Body.Auth.EmailAndPasswordEnabled)
-			s.repo.projectAuthSetting.CreateOAuthProvider(ctx, &models.ProjectOAuthProvider{})
 		}
 		if in.Body.Auth.Google != nil {
 			opt.WithGoogle(in.Body.Auth.Google.ClientID, in.Body.Auth.Google.ClientSecret)
@@ -262,15 +261,17 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 			})
 		}
 
-		err = s.repo.projectAuthSetting.UpsertOAuthProviders(ctx, oauthProviders)
-		if err != nil {
-			return err
-		}
-
 	}
 
 	if needPatchDeployment {
 		err = s.repo.kubeProject.PatchAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(oauthProviders) > 0 {
+		err = s.repo.projectAuthSetting.UpsertOAuthProviders(ctx, oauthProviders)
 		if err != nil {
 			return err
 		}
