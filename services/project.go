@@ -17,7 +17,7 @@ import (
 type ProjectService interface {
 	CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error)
 	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
-	PatchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
+	PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
 	GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error
@@ -191,7 +191,7 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 	return out, nil
 }
 
-func (s *projectService) PatchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error {
+func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error {
 	project, err := s.repo.project.FindByRef(ctx, in.Body.Ref)
 	if err != nil {
 		return err
@@ -200,10 +200,23 @@ func (s *projectService) PatchProjectSetting(ctx context.Context, in *dto.PatchP
 		return huma.Error401Unauthorized("Unauthorized")
 	}
 
+	if in.Body.Name != nil || in.Body.Description != nil {
+		s.repo.project.UpdateByRef(ctx, in.Body.Ref, &models.Project{}, &models.Object{
+			UpdatedAt:          time.Now(),
+			ChineseName:        in.Body.Name,
+			ChineseDescription: in.Body.Description,
+		})
+	}
+
+	if in.Body.TrustedOrigins == nil && in.Body.Auth == nil {
+		return nil // No changes to apply
+	}
+
 	opt := kube.NewAPIDeploymentOption()
 	if in.Body.TrustedOrigins != nil {
 		opt.WithTrustedOrigins(in.Body.TrustedOrigins)
 	}
+
 	if in.Body.Auth != nil {
 		if in.Body.Auth.EmailAndPasswordEnabled != nil {
 			opt.WithEmailAndPasswordAuth(*in.Body.Auth.EmailAndPasswordEnabled)
@@ -268,6 +281,8 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 		case "Cluster in healthy state":
 			s.repo.project.UpdateByRef(ctx, ref, &models.Project{
 				InitializedAt: lo.ToPtr(time.Now()),
+			}, models.Object{
+				UpdatedAt: time.Now(),
 			})
 			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is ready.", Step: 4, TotalStep: totalStep}
 			return nil
@@ -296,6 +311,11 @@ func (s *projectService) ResetDatabasePassword(ctx context.Context, in *dto.Rese
 	if err != nil {
 		return nil, err
 	}
+
+	_ = s.repo.project.UpdateByRef(ctx, in.Body.Reference, map[string]any{"password_expired_at": nil}, models.Object{
+		UpdatedAt: time.Now(),
+	})
+
 	out := &dto.ResetDatabasePasswordOutput{}
 	out.Body.Success = true
 	return out, nil

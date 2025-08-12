@@ -2,7 +2,6 @@ package dto
 
 import (
 	"baas-api/models"
-	"net/http"
 )
 
 type OAuthProvider struct {
@@ -32,7 +31,6 @@ type CreateProjectOutput struct {
 		ID        string `json:"id" doc:"Project ID (nanoid)"`
 		Reference string `json:"reference" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
 	}
-	InitPasswordCookie *http.Cookie `header:"Set-Cookie" doc:"Initial password cookie for database of the project"`
 }
 
 type PatchProjectSettingInput struct {

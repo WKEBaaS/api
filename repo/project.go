@@ -43,7 +43,7 @@ type ProjectRepository interface {
 	// FindAllByUserID 依使用者 ID 取得所有專案 (包含關聯的 Object)。
 	FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	// UpdateByRef 更新專案資訊 (包含關聯的 Object)，依 Reference。
-	UpdateByRef(ctx context.Context, ref string, p *models.Project) error
+	UpdateByRef(ctx context.Context, ref string, project any, object any) error
 }
 
 type projectRepository struct {
@@ -272,16 +272,35 @@ func (r *projectRepository) FindAllByUserID(ctx context.Context, userID string) 
 	return projects, nil
 }
 
-func (r *projectRepository) UpdateByRef(ctx context.Context, ref string, p *models.Project) error {
-	if err := r.db.WithContext(ctx).Model(&models.Project{}).
-		Where("reference = ?", ref).
-		Updates(p).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.WarnContext(ctx, "Project not found for update by reference", "projectRef", ref)
-			return ErrProjectNotFound
+func (r *projectRepository) UpdateByRef(ctx context.Context, ref string, project any, object any) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var updatedProject models.Project
+		err := tx.Model(&updatedProject).
+			Where("reference = ?", ref).
+			Updates(project).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				slog.WarnContext(ctx, "Project not found for update by reference", "projectRef", ref)
+				return ErrProjectNotFound
+			}
+			slog.ErrorContext(ctx, "Failed to update project by reference", "projectRef", ref, "error", err)
+			return errors.New("failed to update project by reference")
 		}
-		slog.ErrorContext(ctx, "Failed to update project by reference", "projectRef", ref, "error", err)
-		return errors.New("failed to update project by reference")
-	}
-	return nil
+
+		err = tx.Model(&models.Object{}).
+			Where("id = ?", updatedProject.ID).
+			Updates(object).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				slog.WarnContext(ctx, "Associated object not found for update by project reference", "objectID", updatedProject.ID, "projectRef", ref)
+				return ErrProjectNotFound
+			}
+			slog.ErrorContext(ctx, "Failed to update associated object by project reference", "objectID", updatedProject.ID, "projectRef", ref, "error", err)
+			return errors.New("failed to update associated object by project reference")
+		}
+
+		return nil
+	})
+
+	return err
 }

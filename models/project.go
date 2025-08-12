@@ -18,7 +18,7 @@ var refRegex = regexp.MustCompile(`^[a-z]{20}$`)
 type Project struct {
 	ID                string     `gorm:"type:varchar(21);primaryKey;unique"` // VARCHAR(21) NOT NULL UNIQUE, 同時是主鍵
 	Reference         string     `gorm:"type:varchar(20);not null;unique"`   // VARCHAR(20) NOT NULL UNIQUE, 也是外鍵
-	PasswordExpiredAt time.Time  `gorm:"type:timestamptz;not null;default:now()" json:"password_expired_at"`
+	PasswordExpiredAt *time.Time `gorm:"type:timestamptz;default:now()" json:"password_expired_at"`
 	InitializedAt     *time.Time `gorm:"type:timestamptz" json:"initialized_at"`
 
 	// gorm one-to-one
@@ -77,7 +77,7 @@ type ProjectView struct {
 	Reference         string     `gorm:"type:varchar(20);not null;unique" json:"reference"` // 外鍵，指向 dbo.projects 資料表
 	CreatedAt         time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
 	UpdatedAt         time.Time  `gorm:"type:timestamptz;not null" json:"updatedAt"`
-	PasswordExpiredAt time.Time  `gorm:"type:timestamptz;not null" json:"passwordExpiredAt"`
+	PasswordExpiredAt *time.Time `gorm:"type:timestamptz" json:"passwordExpiredAt"`
 	InitializedAt     *time.Time `gorm:"type:timestamptz" json:"initializedAt"`
 }
 

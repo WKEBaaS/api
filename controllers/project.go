@@ -15,7 +15,7 @@ import (
 type ProjectController interface {
 	RegisterProjectAPIs(api huma.API)
 	getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error)
-	patchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error)
+	patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error)
 	getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
 	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error)
@@ -59,14 +59,14 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 	}, c.createProject)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "patch-project-setting",
+		OperationID: "patch-project-settings",
 		Method:      http.MethodPatch,
-		Path:        "/project/setting",
-		Summary:     "Patch Project Setting",
-		Description: "Update a project setting by its reference. The reference is a 20-character string.",
+		Path:        "/project/settings",
+		Summary:     "Patch Project Settings",
+		Description: "Update a project settings by its reference. The reference is a 20-character string.",
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
-	}, c.patchProjectSetting)
+	}, c.patchProjectSettings)
 
 	sse.Register(api, huma.Operation{
 		OperationID: "get-project-status",
@@ -125,12 +125,12 @@ func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProj
 	return &dto.GetProjectByRefOutput{Body: *out}, nil
 }
 
-func (c *projectController) patchProjectSetting(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error) {
+func (c *projectController) patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = c.projectService.PatchProjectSetting(ctx, in, session.UserID)
+	err = c.projectService.PatchProjectSettings(ctx, in, session.UserID)
 	if err != nil {
 		return nil, err
 	}
