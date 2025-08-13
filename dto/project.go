@@ -4,10 +4,10 @@ import (
 	"baas-api/models"
 )
 
-type OAuthProvider struct {
+type AuthProvider struct {
 	Enabled      bool   `json:"enabled" doc:"Enable this OAuth provider"`
-	ClientID     string `json:"clientId" doc:"OAuth Client ID"`
-	ClientSecret string `json:"clientSecret" doc:"OAuth Clien Secret"`
+	ClientID     string `json:"clientId,omitempty" doc:"OAuth Client ID"`
+	ClientSecret string `json:"clientSecret,omitempty" doc:"OAuth Clien Secret"`
 }
 
 type GetProjectByRefInput struct {
@@ -40,10 +40,10 @@ type PatchProjectSettingInput struct {
 		Description    *string  `json:"description,omitempty" maxLength:"4000" required:"false" example:"This is my project" doc:"Project description"`
 		TrustedOrigins []string `json:"trustedOrigins,omitempty" example:"https://example.com" doc:"List of trusted origins for CORS"`
 		Auth           *struct {
-			EmailAndPasswordEnabled *bool          `json:"emailAndPasswordEnabled,omitempty" doc:"Enable email and password authentication"`
-			Google                  *OAuthProvider `json:"google,omitempty" doc:"Google OAuth provider settings"`
-			GitHub                  *OAuthProvider `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
-			Discord                 *OAuthProvider `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
+			Email   *AuthProvider `json:"email,omitempty" doc:"Enable email and password authentication"`
+			Google  *AuthProvider `json:"google,omitempty" doc:"Google OAuth provider settings"`
+			GitHub  *AuthProvider `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
+			Discord *AuthProvider `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
 		} `json:"auth,omitempty" doc:"Authentication settings for the project"`
 	}
 }
@@ -82,14 +82,14 @@ type GetProjectSettingsInput struct {
 	Ref string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
 }
 
-type ProjectSettingsAuth struct {
-	EmailAndPasswordEnabled bool                      `json:"emailAndPasswordEnabled" doc:"Enable email and password authentication"`
-	Google                  *ProjectOAuthProviderInfo `json:"google,omitempty" doc:"Google OAuth provider settings"`
-	GitHub                  *ProjectOAuthProviderInfo `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
-	Discord                 *ProjectOAuthProviderInfo `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
+type ProjectAuthSettings struct {
+	Email   *ProjectAuthProviderInfo `json:"email,omitempty" doc:"Email and password authentication settings"`
+	Google  *ProjectAuthProviderInfo `json:"google,omitempty" doc:"Google OAuth provider settings"`
+	GitHub  *ProjectAuthProviderInfo `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
+	Discord *ProjectAuthProviderInfo `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
 }
 
-type ProjectOAuthProviderInfo struct {
+type ProjectAuthProviderInfo struct {
 	Enabled      bool   `json:"enabled" doc:"Whether this OAuth provider is enabled"`
 	ClientID     string `json:"clientId,omitempty" doc:"OAuth Client ID"`
 	ClientSecret string `json:"clientSecret,omitempty" doc:"OAuth Client Secret"`
@@ -99,7 +99,7 @@ type GetProjectSettingsOutput struct {
 	Body struct {
 		ID             string              `json:"id" doc:"Project ID"`
 		TrustedOrigins []string            `json:"trustedOrigins" doc:"List of trusted origins for CORS"`
-		Auth           ProjectSettingsAuth `json:"auth" doc:"Authentication settings for the project"`
+		Auth           ProjectAuthSettings `json:"auth" doc:"Authentication settings for the project"`
 		CreatedAt      string              `json:"createdAt" doc:"Project creation timestamp"`
 		UpdatedAt      string              `json:"updatedAt" doc:"Project last update timestamp"`
 	}

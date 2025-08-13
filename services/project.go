@@ -73,7 +73,7 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.repo.project.DeleteByID(ctx, *id)
 	})
 
-	projectAuthSetting := &models.ProjectAuthSettings{
+	projectAuthSetting := &models.ProjectSettings{
 		ProjectID: *id,
 	}
 	err = s.repo.projectAuthSetting.Create(ctx, projectAuthSetting)
@@ -100,12 +100,28 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
+	// Create default email/password provider
+	emailPasswordProvider := &models.ProjectAuthProvider{
+		Name:         "email",
+		ProjectID:    *id,
+		Enabled:      true,
+		ClientID:     "",
+		ClientSecret: "",
+	}
+	_, err = s.repo.projectAuthSetting.CreateOAuthProvider(ctx, emailPasswordProvider)
+	if err != nil {
+		return nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.repo.projectAuthSetting.DeleteByProjectID(ctx, *id) // This will cascade delete OAuth providers
+	})
+
 	err = s.repo.kubeProject.CreateAPIDeployment(ctx,
 		*ref,
 		kube.NewAPIDeploymentOption().
 			WithNamespace(s.config.Kube.Project.Namespace).
 			WithBetterAuthSecret(projectAuthSetting.Secret).
-			WithEmailAndPasswordAuth(projectAuthSetting.EmailAndPasswordEnabled),
+			WithEmailAndPasswordAuth(true),
 	)
 	if err != nil {
 		return nil, err
@@ -201,18 +217,14 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		return huma.Error401Unauthorized("Unauthorized")
 	}
 
-	if in.Body.TrustedOrigins == nil && in.Body.Auth == nil {
-		return nil // No changes to apply
-	}
-
-	oauthProviders := []*models.ProjectOAuthProvider{}
 	objectPayload := &models.Object{}
 	projectPayload := &models.Project{}
+	authProviders := []*models.ProjectAuthProvider{}
 	needPatchDeployment := false
 
 	if in.Body.Name != nil || in.Body.Description != nil {
 		objectPayload.ChineseName = in.Body.Name
-		objectPayload.EnglishName = in.Body.Name
+		objectPayload.ChineseDescription = in.Body.Description
 		objectPayload.UpdatedAt = time.Now()
 	}
 
@@ -224,12 +236,18 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 
 	if in.Body.Auth != nil {
 		needPatchDeployment = true
-		if in.Body.Auth.EmailAndPasswordEnabled != nil {
-			opt.WithEmailAndPasswordAuth(*in.Body.Auth.EmailAndPasswordEnabled)
+		if in.Body.Auth.Email != nil {
+			opt.WithEmailAndPasswordAuth(in.Body.Auth.Email.Enabled)
+			authProviders = append(authProviders, &models.ProjectAuthProvider{
+				Name:      "email",
+				ProjectID: project.ID,
+				Enabled:   in.Body.Auth.Email.Enabled,
+				UpdatedAt: time.Now(),
+			})
 		}
 		if in.Body.Auth.Google != nil {
 			opt.WithGoogle(in.Body.Auth.Google.ClientID, in.Body.Auth.Google.ClientSecret)
-			oauthProviders = append(oauthProviders, &models.ProjectOAuthProvider{
+			authProviders = append(authProviders, &models.ProjectAuthProvider{
 				Name:         "google",
 				ProjectID:    project.ID,
 				Enabled:      in.Body.Auth.Google.Enabled,
@@ -240,7 +258,7 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		}
 		if in.Body.Auth.GitHub != nil {
 			opt.WithGitHub(in.Body.Auth.GitHub.ClientID, in.Body.Auth.GitHub.ClientSecret)
-			oauthProviders = append(oauthProviders, &models.ProjectOAuthProvider{
+			authProviders = append(authProviders, &models.ProjectAuthProvider{
 				Name:         "github",
 				ProjectID:    project.ID,
 				Enabled:      in.Body.Auth.GitHub.Enabled,
@@ -251,7 +269,7 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		}
 		if in.Body.Auth.Discord != nil {
 			opt.WithDiscord(in.Body.Auth.Discord.ClientID, in.Body.Auth.Discord.ClientSecret)
-			oauthProviders = append(oauthProviders, &models.ProjectOAuthProvider{
+			authProviders = append(authProviders, &models.ProjectAuthProvider{
 				Name:         "discord",
 				ProjectID:    project.ID,
 				Enabled:      in.Body.Auth.Discord.Enabled,
@@ -260,7 +278,6 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 				UpdatedAt:    time.Now(),
 			})
 		}
-
 	}
 
 	if needPatchDeployment {
@@ -270,8 +287,8 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		}
 	}
 
-	if len(oauthProviders) > 0 {
-		err = s.repo.projectAuthSetting.UpsertOAuthProviders(ctx, oauthProviders)
+	if len(authProviders) > 0 {
+		err = s.repo.projectAuthSetting.UpsertOAuthProviders(ctx, authProviders)
 		if err != nil {
 			return err
 		}
@@ -376,16 +393,16 @@ func (s *projectService) GetProjectSettings(ctx context.Context, in *dto.GetProj
 	out.Body.CreatedAt = project.CreatedAt.Format(time.RFC3339)
 	out.Body.UpdatedAt = project.UpdatedAt.Format(time.RFC3339)
 
-	out.Body.Auth.EmailAndPasswordEnabled = authSettings.EmailAndPasswordEnabled
-
 	for _, provider := range oauthProviders {
-		providerInfo := &dto.ProjectOAuthProviderInfo{
+		providerInfo := &dto.ProjectAuthProviderInfo{
 			Enabled:      provider.Enabled,
 			ClientID:     provider.ClientID,
 			ClientSecret: provider.ClientSecret,
 		}
 
 		switch provider.Name {
+		case "email":
+			out.Body.Auth.Email = providerInfo
 		case "google":
 			out.Body.Auth.Google = providerInfo
 		case "github":
