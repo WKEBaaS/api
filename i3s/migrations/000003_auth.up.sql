@@ -1,6 +1,7 @@
 CREATE TABLE auth.users
 (
     id             uuid         NOT NULL DEFAULT uuidv7(),
+    role           VARCHAR(100)          DEFAULT 'authenticated',
     name           VARCHAR(255) NOT NULL,
     email          VARCHAR(255) NOT NULL,
     email_verified BOOLEAN               DEFAULT FALSE NOT NULL,
@@ -122,4 +123,17 @@ CREATE TABLE auth.user_groups
 INSERT INTO auth.groups (name, description)
 VALUES ('admin', 'Admin role'),
        ('user', 'User role'),
-       ('guest', 'Guest role');
+       ('anon', 'Anonymouse role');
+
+CREATE FUNCTION auth.jwt() RETURNS jsonb
+    STABLE
+    LANGUAGE sql
+AS
+$$
+SELECT COALESCE(
+               NULLIF(CURRENT_SETTING('request.jwt.claim', TRUE), ''),
+               NULLIF(CURRENT_SETTING('request.jwt.claims', TRUE), '')
+       )::jsonb
+$$;
+
+-- GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated

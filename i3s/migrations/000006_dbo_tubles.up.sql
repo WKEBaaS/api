@@ -56,7 +56,7 @@ $$
             INSERT INTO dbo.permissions(class_id, role_type, role_id, permission_bits)
             SELECT home_class_id, FALSE, groups.id, default_home_permission
             FROM auth.groups
-            WHERE groups.name IN ('user', 'guest');
+            WHERE groups.name IN ('user', 'anon');
         END IF;
     END
 $$;
