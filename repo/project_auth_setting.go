@@ -19,14 +19,14 @@ var (
 )
 
 type ProjectAuthSettingRepository interface {
-	Create(ctx context.Context, s *models.ProjectAuthSettings) error
-	FindByProjectID(ctx context.Context, projectID string) (*models.ProjectAuthSettings, error)
-	Update(ctx context.Context, s *models.ProjectAuthSettings) error
+	Create(ctx context.Context, s *models.ProjectSettings) error
+	FindByProjectID(ctx context.Context, projectID string) (*models.ProjectSettings, error)
+	Update(ctx context.Context, s *models.ProjectSettings) error
 	DeleteByProjectID(ctx context.Context, projectID string) error
-	CreateOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) (*string, error)
-	UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectOAuthProvider) error
-	FindAllOAuthProviders(ctx context.Context, projectID string) ([]*models.ProjectOAuthProvider, error)
-	UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) error
+	CreateOAuthProvider(ctx context.Context, provider *models.ProjectAuthProvider) (*string, error)
+	UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectAuthProvider) error
+	FindAllOAuthProviders(ctx context.Context, projectID string) ([]*models.ProjectAuthProvider, error)
+	UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectAuthProvider) error
 }
 
 type projectAuthSettingRepository struct {
@@ -39,7 +39,7 @@ func NewProjectAuthSettingRepository(db *gorm.DB) ProjectAuthSettingRepository {
 	}
 }
 
-func (r *projectAuthSettingRepository) Create(ctx context.Context, s *models.ProjectAuthSettings) error {
+func (r *projectAuthSettingRepository) Create(ctx context.Context, s *models.ProjectSettings) error {
 	if err := r.db.WithContext(ctx).Create(s).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to create project auth setting", "error", err)
 		return ErrProjectAuthSettingCreateFailed
@@ -47,8 +47,8 @@ func (r *projectAuthSettingRepository) Create(ctx context.Context, s *models.Pro
 	return nil
 }
 
-func (r *projectAuthSettingRepository) FindByProjectID(ctx context.Context, projectID string) (*models.ProjectAuthSettings, error) {
-	var setting models.ProjectAuthSettings
+func (r *projectAuthSettingRepository) FindByProjectID(ctx context.Context, projectID string) (*models.ProjectSettings, error) {
+	var setting models.ProjectSettings
 	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).First(&setting).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.WarnContext(ctx, "Project auth setting not found", "projectID", projectID)
@@ -60,8 +60,8 @@ func (r *projectAuthSettingRepository) FindByProjectID(ctx context.Context, proj
 	return &setting, nil
 }
 
-func (r *projectAuthSettingRepository) Update(ctx context.Context, s *models.ProjectAuthSettings) error {
-	if err := r.db.WithContext(ctx).Model(&models.ProjectAuthSettings{}).Where("project_id = ?", s.ProjectID).Updates(s).Error; err != nil {
+func (r *projectAuthSettingRepository) Update(ctx context.Context, s *models.ProjectSettings) error {
+	if err := r.db.WithContext(ctx).Model(&models.ProjectSettings{}).Where("project_id = ?", s.ProjectID).Updates(s).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to update project auth setting", "error", err)
 		return ErrDatabaseError
 	}
@@ -69,14 +69,14 @@ func (r *projectAuthSettingRepository) Update(ctx context.Context, s *models.Pro
 }
 
 func (r *projectAuthSettingRepository) DeleteByProjectID(ctx context.Context, projectID string) error {
-	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).Delete(&models.ProjectAuthSettings{}).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).Delete(&models.ProjectSettings{}).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to delete project auth setting", "error", err)
 		return ErrDatabaseError
 	}
 	return nil
 }
 
-func (r *projectAuthSettingRepository) CreateOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) (*string, error) {
+func (r *projectAuthSettingRepository) CreateOAuthProvider(ctx context.Context, provider *models.ProjectAuthProvider) (*string, error) {
 	if err := r.db.WithContext(ctx).Create(provider).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to create project OAuth provider", "error", err)
 		return nil, ErrProjectOAuthProviderCreateFailed
@@ -84,8 +84,8 @@ func (r *projectAuthSettingRepository) CreateOAuthProvider(ctx context.Context, 
 	return lo.ToPtr(provider.ID), nil
 }
 
-func (r *projectAuthSettingRepository) FindAllOAuthProviders(ctx context.Context, projectID string) ([]*models.ProjectOAuthProvider, error) {
-	var providers []*models.ProjectOAuthProvider
+func (r *projectAuthSettingRepository) FindAllOAuthProviders(ctx context.Context, projectID string) ([]*models.ProjectAuthProvider, error) {
+	var providers []*models.ProjectAuthProvider
 	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).Find(&providers).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to find OAuth providers", "error", err)
 		return nil, ErrDatabaseError
@@ -93,8 +93,8 @@ func (r *projectAuthSettingRepository) FindAllOAuthProviders(ctx context.Context
 	return providers, nil
 }
 
-func (r *projectAuthSettingRepository) UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectOAuthProvider) error {
-	var existingProvider models.ProjectOAuthProvider
+func (r *projectAuthSettingRepository) UpdateOrInsertOAuthProvider(ctx context.Context, provider *models.ProjectAuthProvider) error {
+	var existingProvider models.ProjectAuthProvider
 	err := r.db.WithContext(ctx).Where("project_id = ? AND name = ?", provider.ProjectID, provider.Name).First(&existingProvider).Error
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -119,7 +119,7 @@ func (r *projectAuthSettingRepository) UpdateOrInsertOAuthProvider(ctx context.C
 	return nil
 }
 
-func (r *projectAuthSettingRepository) UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectOAuthProvider) error {
+func (r *projectAuthSettingRepository) UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectAuthProvider) error {
 	// FIX: add debug here, since gorm will raise a weird error that insert with  all value null/empty
 	err := r.db.Debug().WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{

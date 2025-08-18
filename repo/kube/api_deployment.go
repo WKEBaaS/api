@@ -25,14 +25,13 @@ type APIDeploymentOption struct {
 }
 
 type AuthConfig struct {
-	EmailAndPasswordEnabled bool
-
-	Google  *OAuthProvider
-	GitHub  *OAuthProvider
-	Discord *OAuthProvider
+	Email   *AuthProvider
+	Google  *AuthProvider
+	GitHub  *AuthProvider
+	Discord *AuthProvider
 }
 
-type OAuthProvider struct {
+type AuthProvider struct {
 	Enabled      bool
 	ClientID     string
 	ClientSecret string
@@ -53,7 +52,9 @@ func (o *APIDeploymentOption) WithTrustedOrigins(origins []string) *APIDeploymen
 }
 
 func (o *APIDeploymentOption) WithEmailAndPasswordAuth(enabled bool) *APIDeploymentOption {
-	o.Auth.EmailAndPasswordEnabled = enabled
+	o.Auth.Email = &AuthProvider{
+		Enabled: enabled,
+	}
 	return o
 }
 
@@ -63,7 +64,7 @@ func (o *APIDeploymentOption) WithBetterAuthSecret(secret string) *APIDeployment
 }
 
 func (o *APIDeploymentOption) WithGoogle(clientID, clientSecret string) *APIDeploymentOption {
-	o.Auth.Google = &OAuthProvider{
+	o.Auth.Google = &AuthProvider{
 		Enabled:      true,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -72,7 +73,7 @@ func (o *APIDeploymentOption) WithGoogle(clientID, clientSecret string) *APIDepl
 }
 
 func (o *APIDeploymentOption) WithGitHub(clientID, clientSecret string) *APIDeploymentOption {
-	o.Auth.GitHub = &OAuthProvider{
+	o.Auth.GitHub = &AuthProvider{
 		Enabled:      true,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -81,7 +82,7 @@ func (o *APIDeploymentOption) WithGitHub(clientID, clientSecret string) *APIDepl
 }
 
 func (o *APIDeploymentOption) WithDiscord(clientID, clientSecret string) *APIDeploymentOption {
-	o.Auth.Discord = &OAuthProvider{
+	o.Auth.Discord = &AuthProvider{
 		Enabled:      true,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -106,7 +107,7 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, ref str
 		},
 		{
 			Name:  "EMAIL_AND_PASSWORD_ENABLED",
-			Value: utils.BoolToString(opt.Auth.EmailAndPasswordEnabled),
+			Value: utils.BoolToString(opt.Auth.Email.Enabled),
 		},
 		{
 			Name: "DATABASE_URL",
@@ -212,10 +213,10 @@ func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespac
 			Value: strings.Join(opt.TrustedOrigins, ","),
 		})
 	}
-	if opt.Auth.EmailAndPasswordEnabled {
+	if opt.Auth.Email != nil {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "EMAIL_AND_PASSWORD_ENABLED",
-			Value: utils.BoolToString(opt.Auth.EmailAndPasswordEnabled),
+			Value: utils.BoolToString(opt.Auth.Email.Enabled),
 		})
 	}
 	if opt.Auth.Google != nil {

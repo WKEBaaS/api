@@ -29,37 +29,36 @@ func (Project) TableName() string {
 	return "dbo.projects"
 }
 
-type ProjectAuthSettings struct {
-	ID                      string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
-	ProjectID               string         `gorm:"type:uuid;not null;unique" json:"project_id"`
-	Secret                  string         `gorm:"type:text;not null;default:encode(gen_random_bytes(32), 'base64')" json:"secret"`
-	TrustedOrigins          pq.StringArray `gorm:"type:text[];not null;default:'{}'" json:"trusted_origins"`
-	EmailAndPasswordEnabled bool           `gorm:"not null;default:true" json:"email_and_password_enabled"`
-	CreatedAt               time.Time      `gorm:"not null;default:now()" json:"created_at"`
-	UpdatedAt               time.Time      `gorm:"not null;default:now()" json:"updated_at"`
+type ProjectSettings struct {
+	ID             string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	ProjectID      string         `gorm:"type:uuid;not null;unique" json:"project_id"`
+	Secret         string         `gorm:"type:text;not null;default:encode(gen_random_bytes(32), 'base64')" json:"secret"`
+	TrustedOrigins pq.StringArray `gorm:"type:text[];not null;default:'{}'" json:"trusted_origins"`
+	CreatedAt      time.Time      `gorm:"not null;default:now()" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"not null;default:now()" json:"updated_at"`
 }
 
 // TableName specifies the table name for ProjectAuthSettings
-func (ProjectAuthSettings) TableName() string {
-	return "dbo.project_auth_settings"
+func (ProjectSettings) TableName() string {
+	return "dbo.project_settings"
 }
 
-// ProjectOAuthProvider represents the project_oauth_providers table
-type ProjectOAuthProvider struct {
+// ProjectAuthProvider represents the project_oauth_providers table
+type ProjectAuthProvider struct {
 	ID           string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
 	Enabled      bool           `gorm:"not null;default:false" json:"enabled"`
 	Name         string         `gorm:"type:varchar(50);not null" json:"name"`
 	ProjectID    string         `gorm:"column:project_id;type:uuid;not null" json:"project_id"` // 加上 column:project_id
 	CreatedAt    time.Time      `gorm:"not null;default:current_timestamp" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"not null;default:current_timestamp" json:"updated_at"`
-	ClientID     string         `gorm:"column:client_id;type:text;not null" json:"client_id"`         // 加上 column:client_id
-	ClientSecret string         `gorm:"column:client_secret;type:text;not null" json:"client_secret"` // 加上 column:client_secret
-	ExtraConfig  datatypes.JSON `gorm:"column:extra_config;type:jsonb" json:"extra_config"`           // 加上 column:extra_config
+	ClientID     string         `gorm:"column:client_id;type:text" json:"client_id"`         // 加上 column:client_id
+	ClientSecret string         `gorm:"column:client_secret;type:text" json:"client_secret"` // 加上 column:client_secret
+	ExtraConfig  datatypes.JSON `gorm:"column:extra_config;type:jsonb" json:"extra_config"`  // 加上 column:extra_config
 }
 
 // TableName specifies the table name for ProjectOAuthProvider
-func (ProjectOAuthProvider) TableName() string {
-	return "dbo.project_oauth_providers"
+func (ProjectAuthProvider) TableName() string {
+	return "dbo.project_auth_providers"
 }
 
 func IsValidReference(ref string) bool {
