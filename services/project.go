@@ -85,12 +85,12 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.kube.DeleteCluster(ctx, *ref)
 	})
 
-	err = s.kube.CreateDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateDatabase(ctx, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteDatabase(ctx, *ref)
 	})
 
 	// Create default email/password provider
@@ -170,7 +170,7 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteDatabase(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
