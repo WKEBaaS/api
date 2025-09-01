@@ -1,7 +1,7 @@
-// Package kube
+// Package kube_project
 //
 // kubernetes related repository for project management
-package kube
+package kube_project
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (r *kubeProjectRepository) CreateCluster(ctx context.Context, namespace string, ref string, storageSize string) error {
+func (r *KubeProjectService) CreateCluster(ctx context.Context, namespace string, ref string, storageSize string) error {
 	pgClusterYAML, err := os.Open("kube-files/project-cnpg-cluster.yaml")
 	if err != nil {
 		slog.Error("Failed to open Postgres cluster YAML file", "error", err)
@@ -51,7 +51,7 @@ func (r *kubeProjectRepository) CreateCluster(ctx context.Context, namespace str
 	return nil
 }
 
-func (r *kubeProjectRepository) DeleteCluster(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteCluster(ctx context.Context, namespace string, ref string) error {
 	// 使用 dynamicClient 刪除資源
 	err := r.dynamicClient.Resource(clusterGVR).
 		Namespace(namespace).
@@ -64,7 +64,7 @@ func (r *kubeProjectRepository) DeleteCluster(ctx context.Context, namespace str
 	return nil
 }
 
-func (r *kubeProjectRepository) FindClusterStatus(ctx context.Context, namespace string, ref string) (*string, error) {
+func (r *KubeProjectService) FindClusterStatus(ctx context.Context, namespace string, ref string) (*string, error) {
 	deployment, err := r.dynamicClient.Resource(clusterGVR).
 		Namespace(namespace).
 		Get(ctx, ref, metav1.GetOptions{})

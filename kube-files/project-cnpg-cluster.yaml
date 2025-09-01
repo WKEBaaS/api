@@ -4,9 +4,55 @@ metadata:
   name: <project_ref>
   namespace: <project_namespace>
 spec:
+  instances: 1
   managed:
     services:
       disabledDefaultServices: ["ro", "r"]
-  instances: 1
+    roles:
+      - name: app
+        login: true
+        superuser: true
+      - name: anon
+        ensure: present
+        comment: PostgREST Anonymous Role
+      - name: authenticated
+        ensure: present
+        comment: PostgREST Logged-in User Role
+      - name: app_admin
+        ensure: present
+        comment: PostgREST App Admin Role
+        bypassrls: true
+      - name: authenticator
+        ensure: present
+        comment: PostgREST Authenticator
+        login: true
+        passwordSecret:
+          name: baas-db-authenticator
+        inRoles:
+          - anon
+          - authenticated
+          - app_admin
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      postInitApplicationSQLRefs:
+        configMapRefs:
+          - name: migrations
+            key: 000001_init.sql
+          - name: migrations
+            key: 000002_nanoid.sql
+          - name: migrations
+            key: 000003_auth.sql
+          - name: migrations
+            key: 000004_dbo.sql
+          - name: migrations
+            key: 000005_dbo_fn.sql
+          - name: migrations
+            key: 000006_dbo_tuples.sql
+          - name: migrations
+            key: 000007_dbo_api.sql
+          - name: migrations
+            key: 000008_auth_api.sql
   storage:
     size: 1Gi

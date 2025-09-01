@@ -1,4 +1,4 @@
-package kube
+package kube_project
 
 import (
 	"baas-api/utils"
@@ -90,7 +90,7 @@ func (o *APIDeploymentOption) WithDiscord(clientID, clientSecret string) *APIDep
 	return o
 }
 
-func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error {
+func (r *KubeProjectService) CreateAuthAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error {
 	// Build environment variables dynamically
 	envVars := []corev1.EnvVar{
 		{
@@ -147,8 +147,8 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, ref str
 		)
 	}
 
-	deploymentName := r.GetAPIDeploymentName(ref)
-	authContainerName := r.GetAPIAuthContainerName(ref)
+	deploymentName := r.GetAuthAPIDeploymentName(ref)
+	authContainerName := r.GetAuthAPIContainerName(ref)
 	// Create the deployment object
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,9 +196,9 @@ func (r *kubeProjectRepository) CreateAPIDeployment(ctx context.Context, ref str
 	return nil
 }
 
-func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error {
-	deploymentName := r.GetAPIDeploymentName(ref)
-	authContainerName := r.GetAPIAuthContainerName(ref)
+func (r *KubeProjectService) PatchAuthAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error {
+	deploymentName := r.GetAuthAPIDeploymentName(ref)
+	authContainerName := r.GetAuthAPIContainerName(ref)
 	envVars := []corev1.EnvVar{}
 
 	if opt.BetterAuthSecret != "" {
@@ -278,13 +278,14 @@ func (r *kubeProjectRepository) PatchAPIDeployment(ctx context.Context, namespac
 	return nil
 }
 
-func (r *kubeProjectRepository) DeleteAPIDeployment(ctx context.Context, namespace string, ref string) error {
-	deploymentName := r.GetAPIDeploymentName(ref)
+func (r *KubeProjectService) DeleteAuthAPIDeployment(ctx context.Context, namespace string, ref string) error {
+	deploymentName := r.GetAuthAPIDeploymentName(ref)
 
 	// Delete the deployment
 	err := r.clientset.AppsV1().Deployments(namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to delete API deployment: %w", err)
+		slog.ErrorContext(ctx, "Failed to delete API deployment", "error", err)
+		return errors.New("failed to delete API deployment")
 	}
 
 	return nil

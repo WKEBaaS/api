@@ -1,4 +1,4 @@
-package kube
+package kube_project
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func (r *kubeProjectRepository) CreateAPIService(ctx context.Context, namespace string, ref string) error {
-	serviceName := r.GetAPIServiceName(ref)
-	deploymentName := r.GetAPIDeploymentName(ref)
+func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, namespace string, ref string) error {
+	serviceName := r.GetAuthAPIServiceName(ref)
+	deploymentName := r.GetAuthAPIDeploymentName(ref)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -44,7 +44,7 @@ func (r *kubeProjectRepository) CreateAPIService(ctx context.Context, namespace 
 	return nil
 }
 
-func (r *kubeProjectRepository) DeleteAPIService(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteAuthAPIService(ctx context.Context, namespace string, ref string) error {
 	serviceName := fmt.Sprintf("%s-api", ref)
 
 	err := r.clientset.CoreV1().Services(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})

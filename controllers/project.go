@@ -12,7 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/sse"
 )
 
-type ProjectController interface {
+type ProjectControllerInterface interface {
 	RegisterProjectAPIs(api huma.API)
 	getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error)
 	patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error)
@@ -24,19 +24,16 @@ type ProjectController interface {
 	resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error)
 }
 
-type projectController struct {
-	config         *config.Config
-	projectService services.ProjectService
+type ProjectController struct {
+	config         *config.Config                   `di.inject:"config"`
+	projectService services.ProjectServiceInterface `di.inject:"projectService"`
 }
 
-func NewProjectController(config *config.Config, projectService services.ProjectService) ProjectController {
-	return &projectController{
-		config:         config,
-		projectService: projectService,
-	}
+func NewProjectController() ProjectControllerInterface {
+	return &ProjectController{}
 }
 
-func (c *projectController) RegisterProjectAPIs(api huma.API) {
+func (c *ProjectController) RegisterProjectAPIs(api huma.API) {
 	authMiddleware := middlewares.NewAuthMiddleware(api, c.config)
 
 	huma.Register(api, huma.Operation{
@@ -124,7 +121,7 @@ func (c *projectController) RegisterProjectAPIs(api huma.API) {
 	}, c.resetDatabasePassword)
 }
 
-func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error) {
+func (c *ProjectController) getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -136,7 +133,7 @@ func (c *projectController) getProjectByRef(ctx context.Context, in *dto.GetProj
 	return &dto.GetProjectByRefOutput{Body: *out}, nil
 }
 
-func (c *projectController) patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error) {
+func (c *ProjectController) patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -148,7 +145,7 @@ func (c *projectController) patchProjectSettings(ctx context.Context, in *dto.Pa
 	return nil, nil
 }
 
-func (c *projectController) getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error) {
+func (c *ProjectController) getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -160,7 +157,7 @@ func (c *projectController) getProjectSettings(ctx context.Context, in *dto.GetP
 	return out, nil
 }
 
-func (c *projectController) getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender) {
+func (c *ProjectController) getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		send.Data(dto.ErrorEvent{Message: "Unauthorized access"})
@@ -196,7 +193,7 @@ func (c *projectController) getProjectStatus(ctx context.Context, in *dto.GetPro
 	}
 }
 
-func (c *projectController) createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error) {
+func (c *ProjectController) createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -209,7 +206,7 @@ func (c *projectController) createProject(ctx context.Context, in *dto.CreatePro
 	return out, nil
 }
 
-func (c *projectController) deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error) {
+func (c *ProjectController) deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -223,7 +220,7 @@ func (c *projectController) deleteProjectByRef(ctx context.Context, in *dto.Dele
 	return out, nil
 }
 
-func (c *projectController) getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error) {
+func (c *ProjectController) getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -240,7 +237,7 @@ func (c *projectController) getUsersProjects(ctx context.Context, in *dto.GetUse
 	return out, nil
 }
 
-func (c *projectController) resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error) {
+func (c *ProjectController) resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err

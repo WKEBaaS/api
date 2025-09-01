@@ -16,8 +16,8 @@ import (
 
 var (
 	db *gorm.DB
-	pp ProjectRepository
-	ep EntityRepository
+	pp ProjectRepositoryInterface
+	ep EntityRepositoryInterface
 )
 
 func TestMain(m *testing.M) {

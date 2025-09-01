@@ -18,7 +18,7 @@ var (
 	ErrFindUsersProjectsFailed = errors.New("failed to find user's projects")
 )
 
-type ProjectRepository interface {
+type ProjectRepositoryInterface interface {
 	// Create
 	//
 	// params:
@@ -46,17 +46,17 @@ type ProjectRepository interface {
 	UpdateByRef(ctx context.Context, ref string, project any, object any) error
 }
 
-type projectRepository struct {
-	db *gorm.DB
+type ProjectRepository struct {
+	db *gorm.DB `di.inject:"db"`
 }
 
-func NewProjectRepository(db *gorm.DB) ProjectRepository {
-	return &projectRepository{
+func NewProjectRepository(db *gorm.DB) ProjectRepositoryInterface {
+	return &ProjectRepository{
 		db: db,
 	}
 }
 
-func (r *projectRepository) Create(ctx context.Context, name string, description *string, entityID string, userID *string) (*string, *string, error) {
+func (r *ProjectRepository) Create(ctx context.Context, name string, description *string, entityID string, userID *string) (*string, *string, error) {
 	ref := gonanoid.MustGenerate(string(lo.LowerCaseLettersCharset), 20)
 
 	object := &models.Object{
@@ -87,7 +87,7 @@ func (r *projectRepository) Create(ctx context.Context, name string, description
 	return lo.ToPtr(project.ID), lo.ToPtr(ref), err
 }
 
-func (r *projectRepository) DeleteByIDSoft(ctx context.Context, id string) error {
+func (r *ProjectRepository) DeleteByIDSoft(ctx context.Context, id string) error {
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("id = ?", id).Delete(&models.Project{}).Error; err != nil {
 			// 檢查是否因為找不到記錄而刪除失敗
@@ -121,7 +121,7 @@ func (r *projectRepository) DeleteByIDSoft(ctx context.Context, id string) error
 	return nil
 }
 
-func (r *projectRepository) DeleteByID(ctx context.Context, id string) error {
+func (r *ProjectRepository) DeleteByID(ctx context.Context, id string) error {
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Where("id = ?", id).Delete(&models.Project{}).Error; err != nil {
 			// 檢查是否因為找不到記錄而刪除失敗
@@ -155,7 +155,7 @@ func (r *projectRepository) DeleteByID(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *projectRepository) DeleteByRefSoft(ctx context.Context, ref string) error {
+func (r *ProjectRepository) DeleteByRefSoft(ctx context.Context, ref string) error {
 	var project models.Project
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
@@ -193,7 +193,7 @@ func (r *projectRepository) DeleteByRefSoft(ctx context.Context, ref string) err
 	return nil
 }
 
-func (r *projectRepository) DeleteByRef(ctx context.Context, ref string) error {
+func (r *ProjectRepository) DeleteByRef(ctx context.Context, ref string) error {
 	var project models.Project
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
@@ -231,7 +231,7 @@ func (r *projectRepository) DeleteByRef(ctx context.Context, ref string) error {
 	return nil
 }
 
-func (r *projectRepository) FindByID(ctx context.Context, id string) (*models.ProjectView, error) {
+func (r *ProjectRepository) FindByID(ctx context.Context, id string) (*models.ProjectView, error) {
 	var project models.ProjectView
 	if err := r.db.WithContext(ctx).First(&project, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -244,7 +244,7 @@ func (r *projectRepository) FindByID(ctx context.Context, id string) (*models.Pr
 	return &project, nil
 }
 
-func (r *projectRepository) FindByRef(ctx context.Context, ref string) (*models.ProjectView, error) {
+func (r *ProjectRepository) FindByRef(ctx context.Context, ref string) (*models.ProjectView, error) {
 	var project models.ProjectView
 	if err := r.db.WithContext(ctx).First(&project, "reference = ?", ref).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -257,7 +257,7 @@ func (r *projectRepository) FindByRef(ctx context.Context, ref string) (*models.
 	return &project, nil
 }
 
-func (r *projectRepository) FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error) {
+func (r *ProjectRepository) FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error) {
 	var projects []*models.ProjectView
 	if err := r.db.WithContext(ctx).
 		Where("owner_id = ?", userID).
@@ -272,7 +272,7 @@ func (r *projectRepository) FindAllByUserID(ctx context.Context, userID string) 
 	return projects, nil
 }
 
-func (r *projectRepository) UpdateByRef(ctx context.Context, ref string, project any, object any) error {
+func (r *ProjectRepository) UpdateByRef(ctx context.Context, ref string, project any, object any) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var p models.Project
 		if err := tx.Select("id").First(&p, "reference = ?", ref).Error; err != nil {

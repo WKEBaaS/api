@@ -3,61 +3,67 @@ package main
 import (
 	"baas-api/config"
 	"baas-api/controllers"
-	"baas-api/i3s"
 	"baas-api/repo"
-	"baas-api/repo/kube"
 	"baas-api/router"
 	"baas-api/services"
-	"log"
+	"baas-api/services/kube"
+	"context"
+	"reflect"
 	"time"
 
+	"github.com/goioc/di"
 	"github.com/patrickmn/go-cache"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
 
-func main() {
-	config, err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("failed to load config: %v\n", err)
-	}
-
-	//////////// Init Gorm Database //////////
-	db, err := gorm.Open(postgres.Open(config.Database.URL), &gorm.Config{
-		NamingStrategy: schema.NamingStrategy{
-			SingularTable: false,
-			NoLowerCase:   false,
-		},
-	})
+func init() {
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	//////////// Migrate I3S Schema //////////
-	i3s := i3s.NewI3S(config)
-	if err := i3s.Migrate(); err != nil {
-		log.Fatalf("failed to migrate database: %v\n", err)
-	}
+	/////////// APP Config //////////
+	_, _ = di.RegisterBeanInstance("config", cfg)
 
-	//////////// Init Cache //////////
-	cache := cache.New(15*time.Minute, 20*time.Minute)
+	//////////// Gorm Database //////////
+	_, _ = di.RegisterBeanFactory("db", di.Singleton, func(ctx context.Context) (any, error) {
+		db, err := gorm.Open(postgres.Open(cfg.Database.URL), &gorm.Config{
+			NamingStrategy: schema.NamingStrategy{
+				SingularTable: false,
+				NoLowerCase:   false,
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+		return db, nil
+	})
+	//////////// Cache //////////
+	_, _ = di.RegisterBeanFactory("cache", di.Singleton, func(ctx context.Context) (any, error) {
+		return cache.New(15*time.Minute, 20*time.Minute), nil
+	})
 
-	// //////////// Init Repo, Service //////////
-	// Repositories
-	projectRepo := repo.NewProjectRepository(db)
-	projectAuthSettingRepo := repo.NewProjectAuthSettingRepository(db)
-	kubeProjectRepo := kube.NewKubeProjectRepository(config)
-	entityRepo := repo.NewEntityRepository(db, cache)
-	// userRepo := repo.NewUserRepository(db, cache)
-	// Services
-	projectService := services.NewProjectService(config, entityRepo, projectRepo, projectAuthSettingRepo, kubeProjectRepo)
-	// authService := services.NewAuthService(config, entityRepo, userRepo)
+	//////////// Repositories //////////
+	_, _ = di.RegisterBean("entityRepository", reflect.TypeOf((*repo.EntityRepository)(nil)))
+	_, _ = di.RegisterBean("projectRepository", reflect.TypeOf((*repo.ProjectRepository)(nil)))
+	_, _ = di.RegisterBean("projectAuthSettingRepository", reflect.TypeOf((*repo.ProjectAuthSettingRepository)(nil)))
 
-	// //////////// Init Controllers //////////
-	// authController := controllers.NewAuthController(config, authService)
-	projectController := controllers.NewProjectController(config, projectService)
+	//////////// Services //////////
+	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeOf((*kube.KubeProjectService)(nil)))
+	_, _ = di.RegisterBean("projectService", reflect.TypeOf((*services.ProjectService)(nil)))
 
+	//////////// Controllers //////////
+	_, _ = di.RegisterBean("projectController", reflect.TypeOf((*controllers.ProjectController)(nil)))
+
+	/////////// Initialize Container //////////
+	_ = di.InitializeContainer()
+}
+
+func main() {
+	config := di.GetInstance("config").(*config.Config)
+	projectController := di.GetInstance("projectController").(controllers.ProjectControllerInterface)
 	cli := router.NewAPICli(config, projectController)
 
 	cli.Run()

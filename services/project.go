@@ -5,7 +5,7 @@ import (
 	"baas-api/dto"
 	"baas-api/models"
 	"baas-api/repo"
-	"baas-api/repo/kube"
+	"baas-api/services/kube"
 	"context"
 	"log/slog"
 	"time"
@@ -14,7 +14,7 @@ import (
 	"github.com/samber/lo"
 )
 
-type ProjectService interface {
+type ProjectServiceInterface interface {
 	CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error)
 	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
 	PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
@@ -25,28 +25,21 @@ type ProjectService interface {
 	ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error)
 }
 
-type projectService struct {
-	config *config.Config
-	repo   struct {
-		entity             repo.EntityRepository
-		project            repo.ProjectRepository
-		projectAuthSetting repo.ProjectAuthSettingRepository
-		kubeProject        kube.KubeProjectRepository
-	}
+type ProjectService struct {
+	config             *config.Config                             `di.inject:"config"`
+	kube               kube.KubeProjectServiceInterface           `di.inject:"kubeProjectService"`
+	entity             repo.EntityRepositoryInterface             `di.inject:"entityRepository"`
+	project            repo.ProjectRepositoryInterface            `di.inject:"projectRepository"`
+	projectAuthSetting repo.ProjectAuthSettingRepositoryInterface `di.inject:"projectAuthSettingRepository"`
 }
 
-func NewProjectService(config *config.Config, ep repo.EntityRepository, pp repo.ProjectRepository, ps repo.ProjectAuthSettingRepository, kp kube.KubeProjectRepository) ProjectService {
-	service := &projectService{}
-	service.config = config
-	service.repo.entity = ep
-	service.repo.project = pp
-	service.repo.projectAuthSetting = ps
-	service.repo.kubeProject = kp
+func NewProjectService() ProjectServiceInterface {
+	service := &ProjectService{}
 	return service
 }
 
-func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error) {
-	projectEntity, err := s.repo.entity.GetByChineseName(ctx, "專案")
+func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error) {
+	projectEntity, err := s.entity.GetByChineseName(ctx, "專案")
 	if err != nil {
 		return nil, err
 	}
@@ -65,39 +58,39 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		}
 	}()
 
-	id, ref, err := s.repo.project.Create(ctx, in.Body.Name, in.Body.Description, projectEntity.ID, userID)
+	id, ref, err := s.project.Create(ctx, in.Body.Name, in.Body.Description, projectEntity.ID, userID)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.project.DeleteByID(ctx, *id)
+		_ = s.project.DeleteByID(ctx, *id)
 	})
 
 	projectAuthSetting := &models.ProjectSettings{
 		ProjectID: *id,
 	}
-	err = s.repo.projectAuthSetting.Create(ctx, projectAuthSetting)
+	err = s.projectAuthSetting.Create(ctx, projectAuthSetting)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.projectAuthSetting.DeleteByProjectID(ctx, *id)
+		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id)
 	})
 
-	err = s.repo.kubeProject.CreateCluster(ctx, s.config.Kube.Project.Namespace, *ref, in.Body.StorageSize)
+	err = s.kube.CreateCluster(ctx, s.config.Kube.Project.Namespace, *ref, in.Body.StorageSize)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteCluster(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteCluster(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
-	err = s.repo.kubeProject.CreateDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
 	// Create default email/password provider
@@ -108,15 +101,15 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		ClientID:     "",
 		ClientSecret: "",
 	}
-	_, err = s.repo.projectAuthSetting.CreateOAuthProvider(ctx, emailPasswordProvider)
+	_, err = s.projectAuthSetting.CreateOAuthProvider(ctx, emailPasswordProvider)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.projectAuthSetting.DeleteByProjectID(ctx, *id) // This will cascade delete OAuth providers
+		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id) // This will cascade delete OAuth providers
 	})
 
-	err = s.repo.kubeProject.CreateAPIDeployment(ctx,
+	err = s.kube.CreateAuthAPIDeployment(ctx,
 		*ref,
 		kube.NewAPIDeploymentOption().
 			WithNamespace(s.config.Kube.Project.Namespace).
@@ -127,31 +120,31 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteAuthAPIDeployment(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
-	err = s.repo.kubeProject.CreateAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateAuthAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteAuthAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
-	err = s.repo.kubeProject.CreateIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
-	err = s.repo.kubeProject.CreateIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
 	})
 
 	success = true // Mark as successful if we reach here without errors
@@ -162,8 +155,8 @@ func (s *projectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	return out, nil
 }
 
-func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
-	project, err := s.repo.project.FindByRef(ctx, in.Reference)
+func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
+	project, err := s.project.FindByRef(ctx, in.Reference)
 	if err != nil {
 		return nil, err
 	}
@@ -173,27 +166,27 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 
 	var errors []error
 
-	err = s.repo.kubeProject.DeleteCluster(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteCluster(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.repo.kubeProject.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteDatabase(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.repo.project.DeleteByRef(ctx, in.Reference)
+	err = s.project.DeleteByRef(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.repo.kubeProject.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.repo.kubeProject.DeleteAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteAuthAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -208,8 +201,8 @@ func (s *projectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 	return out, nil
 }
 
-func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error {
-	project, err := s.repo.project.FindByRef(ctx, in.Body.Ref)
+func (s *ProjectService) PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error {
+	project, err := s.project.FindByRef(ctx, in.Body.Ref)
 	if err != nil {
 		return err
 	}
@@ -281,20 +274,20 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 	}
 
 	if needPatchDeployment {
-		err = s.repo.kubeProject.PatchAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
+		err = s.kube.PatchAuthAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(authProviders) > 0 {
-		err = s.repo.projectAuthSetting.UpsertOAuthProviders(ctx, authProviders)
+		err = s.projectAuthSetting.UpsertOAuthProviders(ctx, authProviders)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = s.repo.project.UpdateByRef(ctx, in.Body.Ref, projectPayload, objectPayload)
+	err = s.project.UpdateByRef(ctx, in.Body.Ref, projectPayload, objectPayload)
 	if err != nil {
 		return err
 	}
@@ -302,8 +295,8 @@ func (s *projectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 	return nil
 }
 
-func (s *projectService) GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error) {
-	projects, err := s.repo.project.FindAllByUserID(ctx, userID)
+func (s *ProjectService) GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error) {
+	projects, err := s.project.FindAllByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -311,8 +304,8 @@ func (s *projectService) GetUsersProjects(ctx context.Context, userID string) ([
 	return projects, nil
 }
 
-func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error {
-	project, err := s.repo.project.FindByRef(ctx, ref)
+func (s *ProjectService) GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error {
+	project, err := s.project.FindByRef(ctx, ref)
 	if err != nil {
 		return err
 	}
@@ -325,7 +318,7 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 
 	totalStep := 4
 	for {
-		status, err := s.repo.kubeProject.FindClusterStatus(ctx, s.config.Kube.Project.Namespace, ref)
+		status, err := s.kube.FindClusterStatus(ctx, s.config.Kube.Project.Namespace, ref)
 		if err != nil {
 			return err
 		}
@@ -341,7 +334,7 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 		case "Waiting for the instances to become active":
 			c <- dto.ProjectStatusEvent{Message: "Postgres Waiting for the instances to become active", Step: 3, TotalStep: totalStep}
 		case "Cluster in healthy state":
-			s.repo.project.UpdateByRef(ctx, ref, &models.Project{
+			s.project.UpdateByRef(ctx, ref, &models.Project{
 				InitializedAt: lo.ToPtr(time.Now()),
 			}, models.Object{
 				UpdatedAt: time.Now(),
@@ -355,8 +348,8 @@ func (s *projectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 	}
 }
 
-func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error) {
-	project, err := s.repo.project.FindByRef(ctx, ref)
+func (s *ProjectService) GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error) {
+	project, err := s.project.FindByRef(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -368,8 +361,8 @@ func (s *projectService) GetUserProjectByRef(ctx context.Context, ref, userID st
 	return project, nil
 }
 
-func (s *projectService) GetProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput, userID string) (*dto.GetProjectSettingsOutput, error) {
-	project, err := s.repo.project.FindByRef(ctx, in.Ref)
+func (s *ProjectService) GetProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput, userID string) (*dto.GetProjectSettingsOutput, error) {
+	project, err := s.project.FindByRef(ctx, in.Ref)
 	if err != nil {
 		return nil, err
 	}
@@ -377,12 +370,12 @@ func (s *projectService) GetProjectSettings(ctx context.Context, in *dto.GetProj
 		return nil, huma.Error401Unauthorized("Unauthorized")
 	}
 
-	authSettings, err := s.repo.projectAuthSetting.FindByProjectID(ctx, project.ID)
+	authSettings, err := s.projectAuthSetting.FindByProjectID(ctx, project.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	oauthProviders, err := s.repo.projectAuthSetting.FindAllOAuthProviders(ctx, project.ID)
+	oauthProviders, err := s.projectAuthSetting.FindAllOAuthProviders(ctx, project.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -415,13 +408,13 @@ func (s *projectService) GetProjectSettings(ctx context.Context, in *dto.GetProj
 	return out, nil
 }
 
-func (s *projectService) ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error) {
-	err := s.repo.kubeProject.ResetDatabasePassword(ctx, s.config.Kube.Project.Namespace, in.Body.Reference, in.Body.Password)
+func (s *ProjectService) ResetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput, userID string) (*dto.ResetDatabasePasswordOutput, error) {
+	err := s.kube.UpdateDatabaseRoleSecret(ctx, in.Body.Reference, "app", in.Body.Password)
 	if err != nil {
 		return nil, err
 	}
 
-	_ = s.repo.project.UpdateByRef(ctx, in.Body.Reference, map[string]any{"password_expired_at": nil}, models.Object{
+	_ = s.project.UpdateByRef(ctx, in.Body.Reference, map[string]any{"password_expired_at": nil}, models.Object{
 		UpdatedAt: time.Now(),
 	})
 

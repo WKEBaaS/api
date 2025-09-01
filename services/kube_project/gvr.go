@@ -1,7 +1,7 @@
 // Package kube
 //
 // kubernetes related repository for project management
-package kube
+package kube_project
 
 import "k8s.io/apimachinery/pkg/runtime/schema"
 

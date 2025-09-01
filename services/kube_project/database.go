@@ -1,11 +1,10 @@
 // Package kube
 //
 // kubernetes related repository for project management
-package kube
+package kube_project
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -14,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (r *kubeProjectRepository) CreateDatabase(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) CreateDatabase(ctx context.Context, namespace string, ref string) error {
 	pgDatabaseYAML, err := os.Open("kube-files/project-cnpg-database.yaml")
 	if err != nil {
 		slog.Error("Failed to open Postgres database YAML file", "error", err)
@@ -51,7 +50,7 @@ func (r *kubeProjectRepository) CreateDatabase(ctx context.Context, namespace st
 	return nil
 }
 
-func (r *kubeProjectRepository) DeleteDatabase(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteDatabase(ctx context.Context, namespace string, ref string) error {
 	// 使用 dynamicClient 刪除資源
 	err := r.dynamicClient.Resource(databaseGVR).
 		Namespace(namespace).
@@ -59,43 +58,6 @@ func (r *kubeProjectRepository) DeleteDatabase(ctx context.Context, namespace st
 	if err != nil {
 		slog.Error("Failed to delete Postgres database", "error", err)
 		return ErrFailedToDeletePostgresDatabase
-	}
-
-	return nil
-}
-
-func (r *kubeProjectRepository) ReadDatabasePassword(ctx context.Context, namespace string, ref string) (*string, error) {
-	secretName := fmt.Sprintf("%s-app", ref)
-	secret, err := r.clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		slog.Error("Failed to read database secret", "error", err)
-		return nil, ErrFailedToReadDatabaseSecret
-	}
-
-	passwordBytes, ok := secret.Data["password"]
-	if !ok {
-		slog.Error("Password not found in database secret", "secretName", secretName)
-		return nil, ErrFailedToReadDatabaseSecret
-	}
-
-	password := string(passwordBytes)
-	return &password, nil
-}
-
-func (r *kubeProjectRepository) ResetDatabasePassword(ctx context.Context, namespace, ref, password string) error {
-	secretName := fmt.Sprintf("%s-app", ref)
-	secret, err := r.clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		slog.Error("Failed to read database secret", "error", err)
-		return ErrFailedToReadDatabaseSecret
-	}
-
-	// Update the secret with the new password
-	secret.Data["password"] = []byte(password)
-	_, err = r.clientset.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
-	if err != nil {
-		slog.Error("Failed to update database secret with new password", "error", err)
-		return ErrFailedToResetDatabasePassword
 	}
 
 	return nil

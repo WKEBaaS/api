@@ -13,23 +13,23 @@ import (
 
 var ErrEntityNotFound = errors.New("entity not found")
 
-type EntityRepository interface {
+type EntityRepositoryInterface interface {
 	GetByChineseName(ctx context.Context, cname string) (*models.Entity, error)
 }
 
-type entityRepository struct {
-	db    *gorm.DB
-	cache *cache.Cache
+type EntityRepository struct {
+	db    *gorm.DB     `di.inject:"db"`
+	cache *cache.Cache `di.inject:"cache"`
 }
 
-func NewEntityRepository(db *gorm.DB, cache *cache.Cache) EntityRepository {
-	return &entityRepository{
+func NewEntityRepository(db *gorm.DB, cache *cache.Cache) EntityRepositoryInterface {
+	return &EntityRepository{
 		db:    db,
 		cache: cache,
 	}
 }
 
-func (r *entityRepository) GetByChineseName(ctx context.Context, name string) (*models.Entity, error) {
+func (r *EntityRepository) GetByChineseName(ctx context.Context, name string) (*models.Entity, error) {
 	// Check cache first
 	var entity models.Entity
 	if cachedEntity, found := r.cache.Get("entity" + name); found {
