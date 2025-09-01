@@ -5,7 +5,7 @@ import (
 	"baas-api/dto"
 	"baas-api/models"
 	"baas-api/repo"
-	"baas-api/services/kube"
+	"baas-api/services/kube_project"
 	"context"
 	"log/slog"
 	"time"
@@ -27,7 +27,7 @@ type ProjectServiceInterface interface {
 
 type ProjectService struct {
 	config             *config.Config                             `di.inject:"config"`
-	kube               kube.KubeProjectServiceInterface           `di.inject:"kubeProjectService"`
+	kube               kube_project.KubeProjectServiceInterface   `di.inject:"kubeProjectService"`
 	entity             repo.EntityRepositoryInterface             `di.inject:"entityRepository"`
 	project            repo.ProjectRepositoryInterface            `di.inject:"projectRepository"`
 	projectAuthSetting repo.ProjectAuthSettingRepositoryInterface `di.inject:"projectAuthSettingRepository"`
@@ -111,7 +111,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	err = s.kube.CreateAuthAPIDeployment(ctx,
 		*ref,
-		kube.NewAPIDeploymentOption().
+		kube_project.NewAPIDeploymentOption().
 			WithNamespace(s.config.Kube.Project.Namespace).
 			WithBetterAuthSecret(projectAuthSetting.Secret).
 			WithEmailAndPasswordAuth(true),
@@ -221,7 +221,7 @@ func (s *ProjectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 		objectPayload.UpdatedAt = time.Now()
 	}
 
-	opt := kube.NewAPIDeploymentOption()
+	opt := kube_project.NewAPIDeploymentOption()
 	if in.Body.TrustedOrigins != nil {
 		needPatchDeployment = true
 		opt.WithTrustedOrigins(in.Body.TrustedOrigins)
