@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, ref string) error {
 	ingressRouteTCPYAML, err := os.Open("kube-files/project-ingressroute.yaml")
 	if err != nil {
 		slog.Error("Failed to open IngressRoute YAML file", "error", err)
@@ -33,7 +33,7 @@ func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, namespace s
 	// set metadata
 	ingressRouteName := r.GetAPIIngressRouteName(ref)
 	ingressRouteUnstructured.SetName(ingressRouteName)
-	ingressRouteUnstructured.SetNamespace(namespace)
+	ingressRouteUnstructured.SetNamespace(r.namespace)
 
 	// set spec.routes[0]
 	projectHost := r.GenProjectHost(ref)
@@ -58,7 +58,7 @@ func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, namespace s
 
 	// 使用 dynamicClient 創建資源
 	_, err = r.dynamicClient.Resource(ingressRouteGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Create(ctx, ingressRouteUnstructured, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create IngressRoute", "error", err)
@@ -68,11 +68,11 @@ func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, namespace s
 	return nil
 }
 
-func (r *KubeProjectService) DeleteIngressRoute(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteIngressRoute(ctx context.Context, ref string) error {
 	// 使用 dynamicClient 刪除資源
 	target := r.GetAPIIngressRouteName(ref)
 	err := r.dynamicClient.Resource(ingressRouteGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Delete(ctx, target, metav1.DeleteOptions{})
 	if err != nil {
 		slog.Error("Failed to delete IngressRoute", "error", err)
@@ -82,7 +82,7 @@ func (r *KubeProjectService) DeleteIngressRoute(ctx context.Context, namespace s
 	return nil
 }
 
-func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, ref string) error {
 	ingressRouteTCPYAML, err := os.Open("kube-files/project-ingressroutetcp.yaml")
 	if err != nil {
 		slog.Error("Failed to open IngressRouteTCP YAML file", "error", err)
@@ -100,7 +100,7 @@ func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, namespac
 	// set metadata
 	dbIngressRouteTCPName := r.GetDBIngressRouteTCPName(ref)
 	ingressRouteTCPUnstructured.SetName(dbIngressRouteTCPName)
-	ingressRouteTCPUnstructured.SetNamespace(namespace)
+	ingressRouteTCPUnstructured.SetNamespace(r.namespace)
 
 	// set spec.routes[0]
 	projectHost := r.GenProjectHost(ref)
@@ -124,7 +124,7 @@ func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, namespac
 
 	// 使用 dynamicClient 創建資源
 	_, err = r.dynamicClient.Resource(ingressRouteTCPGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Create(ctx, ingressRouteTCPUnstructured, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create IngressRouteTCP", "error", err)
@@ -134,11 +134,11 @@ func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, namespac
 	return nil
 }
 
-func (r *KubeProjectService) DeleteIngressRouteTCP(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteIngressRouteTCP(ctx context.Context, ref string) error {
 	// 使用 dynamicClient 刪除資源
 	target := r.GetDBIngressRouteTCPName(ref)
 	err := r.dynamicClient.Resource(ingressRouteTCPGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Delete(ctx, target, metav1.DeleteOptions{})
 	if err != nil {
 		slog.Error("Failed to delete IngressRouteTCP", "error", err)

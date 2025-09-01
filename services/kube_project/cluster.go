@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (r *KubeProjectService) CreateCluster(ctx context.Context, namespace string, ref string, storageSize string) error {
+func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, storageSize string) error {
 	pgClusterYAML, err := os.Open("kube-files/project-cnpg-cluster.yaml")
 	if err != nil {
 		slog.Error("Failed to open Postgres cluster YAML file", "error", err)
@@ -31,7 +31,7 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, namespace string
 
 	// set metadata
 	pgClusterUnstructured.SetName(ref)
-	pgClusterUnstructured.SetNamespace(namespace)
+	pgClusterUnstructured.SetNamespace(r.namespace)
 
 	// set spec.storage.size
 	if err := unstructured.SetNestedField(pgClusterUnstructured.Object, storageSize, "spec", "storage", "size"); err != nil {
@@ -41,7 +41,7 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, namespace string
 
 	// 使用 dynamicClient 創建資源
 	_, err = r.dynamicClient.Resource(clusterGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Create(ctx, pgClusterUnstructured, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create Postgres cluster", "error", err)
@@ -51,10 +51,10 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, namespace string
 	return nil
 }
 
-func (r *KubeProjectService) DeleteCluster(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteCluster(ctx context.Context, ref string) error {
 	// 使用 dynamicClient 刪除資源
 	err := r.dynamicClient.Resource(clusterGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Delete(ctx, ref, metav1.DeleteOptions{})
 	if err != nil {
 		slog.Error("Failed to delete Postgres cluster", "error", err)
@@ -64,9 +64,9 @@ func (r *KubeProjectService) DeleteCluster(ctx context.Context, namespace string
 	return nil
 }
 
-func (r *KubeProjectService) FindClusterStatus(ctx context.Context, namespace string, ref string) (*string, error) {
+func (r *KubeProjectService) FindClusterStatus(ctx context.Context, ref string) (*string, error) {
 	deployment, err := r.dynamicClient.Resource(clusterGVR).
-		Namespace(namespace).
+		Namespace(r.namespace).
 		Get(ctx, ref, metav1.GetOptions{})
 	if err != nil {
 		slog.Error("Failed to get postgres cluster", "error", err)

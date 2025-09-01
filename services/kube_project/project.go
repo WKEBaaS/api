@@ -17,13 +17,13 @@ import (
 type KubeProjectServiceInterface interface {
 	// === 基礎設施層 ===
 	// CNPG Cluster 管理
-	CreateCluster(ctx context.Context, namespace, ref, storageSize string) error
-	DeleteCluster(ctx context.Context, namespace, ref string) error
-	FindClusterStatus(ctx context.Context, namespace, ref string) (*string, error)
+	CreateCluster(ctx context.Context, ref string, storageSize string) error
+	DeleteCluster(ctx context.Context, ref string) error
+	FindClusterStatus(ctx context.Context, ref string) (*string, error)
 
 	// Database Management
-	CreateDatabase(ctx context.Context, namespace, ref string) error
-	DeleteDatabase(ctx context.Context, namespace, ref string) error
+	CreateDatabase(ctx context.Context, ref string) error
+	DeleteDatabase(ctx context.Context, ref string) error
 
 	// Database Role Management
 	FindDatabaseRolePassword(ctx context.Context, ref, role string) (*string, error)
@@ -33,21 +33,21 @@ type KubeProjectServiceInterface interface {
 	// === 應用層 ===
 	// Auth API
 	CreateAuthAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error
-	DeleteAuthAPIDeployment(ctx context.Context, namespace, ref string) error
-	PatchAuthAPIDeployment(ctx context.Context, namespace, ref string, opt *APIDeploymentOption) error
-	CreateAuthAPIService(ctx context.Context, namespace, ref string) error
-	DeleteAuthAPIService(ctx context.Context, namespace, ref string) error
+	DeleteAuthAPIDeployment(ctx context.Context, ref string) error
+	PatchAuthAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error
+	CreateAuthAPIService(ctx context.Context, ref string) error
+	DeleteAuthAPIService(ctx context.Context, ref string) error
 
 	// REST API (PostgREST)
 	CreateRESTAPIDeployment(ctx context.Context, ref string, jwks string) error
-	DeleteRESTAPIDeployment(ctx context.Context, namespace, ref string) error
+	DeleteRESTAPIDeployment(ctx context.Context, ref string) error
 
 	// === 網路層 ===
 	// Ingress for REST API (PostgREST) and Auth API
-	CreateIngressRoute(ctx context.Context, namespace, ref string) error
-	DeleteIngressRoute(ctx context.Context, namespace, ref string) error
-	CreateIngressRouteTCP(ctx context.Context, namespace, ref string) error
-	DeleteIngressRouteTCP(ctx context.Context, namespace, ref string) error
+	CreateIngressRoute(ctx context.Context, ref string) error
+	DeleteIngressRoute(ctx context.Context, ref string) error
+	CreateIngressRouteTCP(ctx context.Context, ref string) error
+	DeleteIngressRouteTCP(ctx context.Context, ref string) error
 }
 
 type KubeProjectService struct {

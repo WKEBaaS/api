@@ -17,7 +17,6 @@ import (
 )
 
 type APIDeploymentOption struct {
-	Namespace        string
 	BetterAuthSecret string
 	TrustedOrigins   []string
 
@@ -39,11 +38,6 @@ type AuthProvider struct {
 
 func NewAPIDeploymentOption() *APIDeploymentOption {
 	return &APIDeploymentOption{}
-}
-
-func (o *APIDeploymentOption) WithNamespace(namespace string) *APIDeploymentOption {
-	o.Namespace = namespace
-	return o
 }
 
 func (o *APIDeploymentOption) WithTrustedOrigins(origins []string) *APIDeploymentOption {
@@ -153,7 +147,7 @@ func (r *KubeProjectService) CreateAuthAPIDeployment(ctx context.Context, ref st
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
-			Namespace: opt.Namespace,
+			Namespace: r.namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: lo.ToPtr(int32(1)),
@@ -172,7 +166,7 @@ func (r *KubeProjectService) CreateAuthAPIDeployment(ctx context.Context, ref st
 					Containers: []corev1.Container{
 						{
 							Name:  authContainerName,
-							Image: "ghcr.io/wkebaas/project-auth:v0.0.12",
+							Image: "ghcr.io/wkebaas/project-auth:v0.0.13",
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 3000,
@@ -187,7 +181,7 @@ func (r *KubeProjectService) CreateAuthAPIDeployment(ctx context.Context, ref st
 	}
 
 	// Create the deployment
-	_, err := r.clientset.AppsV1().Deployments(opt.Namespace).Create(ctx, deployment, metav1.CreateOptions{})
+	_, err := r.clientset.AppsV1().Deployments(r.namespace).Create(ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create API deployment", "error", err)
 		return errors.New("failed to create API deployment")
@@ -196,7 +190,7 @@ func (r *KubeProjectService) CreateAuthAPIDeployment(ctx context.Context, ref st
 	return nil
 }
 
-func (r *KubeProjectService) PatchAuthAPIDeployment(ctx context.Context, namespace string, ref string, opt *APIDeploymentOption) error {
+func (r *KubeProjectService) PatchAuthAPIDeployment(ctx context.Context, ref string, opt *APIDeploymentOption) error {
 	deploymentName := r.GetAuthAPIDeploymentName(ref)
 	authContainerName := r.GetAuthAPIContainerName(ref)
 	envVars := []corev1.EnvVar{}
@@ -263,7 +257,7 @@ func (r *KubeProjectService) PatchAuthAPIDeployment(ctx context.Context, namespa
 	}
 
 	// Patch the deployment
-	_, err = r.clientset.AppsV1().Deployments(namespace).Patch(
+	_, err = r.clientset.AppsV1().Deployments(r.namespace).Patch(
 		ctx,
 		deploymentName,
 		types.StrategicMergePatchType,
@@ -278,11 +272,11 @@ func (r *KubeProjectService) PatchAuthAPIDeployment(ctx context.Context, namespa
 	return nil
 }
 
-func (r *KubeProjectService) DeleteAuthAPIDeployment(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteAuthAPIDeployment(ctx context.Context, ref string) error {
 	deploymentName := r.GetAuthAPIDeploymentName(ref)
 
 	// Delete the deployment
-	err := r.clientset.AppsV1().Deployments(namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
+	err := r.clientset.AppsV1().Deployments(r.namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to delete API deployment", "error", err)
 		return errors.New("failed to delete API deployment")

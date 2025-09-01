@@ -11,13 +11,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref string) error {
 	serviceName := r.GetAuthAPIServiceName(ref)
 	deploymentName := r.GetAuthAPIDeploymentName(ref)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: namespace,
+			Namespace: r.namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeClusterIP,
@@ -35,7 +35,7 @@ func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, namespace
 		},
 	}
 
-	_, err := r.clientset.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+	_, err := r.clientset.CoreV1().Services(r.namespace).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create API service", "error", err)
 		return errors.New("failed to create API service")
@@ -44,10 +44,10 @@ func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, namespace
 	return nil
 }
 
-func (r *KubeProjectService) DeleteAuthAPIService(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteAuthAPIService(ctx context.Context, ref string) error {
 	serviceName := fmt.Sprintf("%s-api", ref)
 
-	err := r.clientset.CoreV1().Services(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
+	err := r.clientset.CoreV1().Services(r.namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to delete API service", "error", err)
 		return errors.New("failed to delete API service")

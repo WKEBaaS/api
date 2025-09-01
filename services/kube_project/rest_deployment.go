@@ -90,11 +90,11 @@ func (r *KubeProjectService) CreateRESTAPIDeployment(ctx context.Context, ref st
 	return nil
 }
 
-func (r *KubeProjectService) DeleteRESTAPIDeployment(ctx context.Context, namespace string, ref string) error {
+func (r *KubeProjectService) DeleteRESTAPIDeployment(ctx context.Context, ref string) error {
 	deploymentName := r.GetRESTAPIDeploymentName(ref)
 
 	// Delete the deployment
-	err := r.clientset.AppsV1().Deployments(namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
+	err := r.clientset.AppsV1().Deployments(r.namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to delete API deployment", "error", err)
 		return errors.New("failed to delete API deployment")

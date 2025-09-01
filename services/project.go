@@ -77,12 +77,12 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id)
 	})
 
-	err = s.kube.CreateCluster(ctx, s.config.Kube.Project.Namespace, *ref, in.Body.StorageSize)
+	err = s.kube.CreateCluster(ctx, *ref, in.Body.StorageSize)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteCluster(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteCluster(ctx, *ref)
 	})
 
 	err = s.kube.CreateDatabase(ctx, s.config.Kube.Project.Namespace, *ref)
@@ -112,7 +112,6 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	err = s.kube.CreateAuthAPIDeployment(ctx,
 		*ref,
 		kube_project.NewAPIDeploymentOption().
-			WithNamespace(s.config.Kube.Project.Namespace).
 			WithBetterAuthSecret(projectAuthSetting.Secret).
 			WithEmailAndPasswordAuth(true),
 	)
@@ -120,31 +119,31 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteAuthAPIDeployment(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteAuthAPIDeployment(ctx, *ref)
 	})
 
-	err = s.kube.CreateAuthAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateAuthAPIService(ctx, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteAuthAPIService(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteAuthAPIService(ctx, *ref)
 	})
 
-	err = s.kube.CreateIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateIngressRoute(ctx, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteIngressRoute(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteIngressRoute(ctx, *ref)
 	})
 
-	err = s.kube.CreateIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+	err = s.kube.CreateIngressRouteTCP(ctx, *ref)
 	if err != nil {
 		return nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, *ref)
+		_ = s.kube.DeleteIngressRouteTCP(ctx, *ref)
 	})
 
 	success = true // Mark as successful if we reach here without errors
@@ -166,7 +165,7 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 
 	var errors []error
 
-	err = s.kube.DeleteCluster(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteCluster(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -181,12 +180,12 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteIngressRouteTCP(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteIngressRouteTCP(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteAuthAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Reference)
+	err = s.kube.DeleteAuthAPIDeployment(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -274,7 +273,7 @@ func (s *ProjectService) PatchProjectSettings(ctx context.Context, in *dto.Patch
 	}
 
 	if needPatchDeployment {
-		err = s.kube.PatchAuthAPIDeployment(ctx, s.config.Kube.Project.Namespace, in.Body.Ref, opt)
+		err = s.kube.PatchAuthAPIDeployment(ctx, in.Body.Ref, opt)
 		if err != nil {
 			return err
 		}
@@ -318,7 +317,7 @@ func (s *ProjectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 
 	totalStep := 4
 	for {
-		status, err := s.kube.FindClusterStatus(ctx, s.config.Kube.Project.Namespace, ref)
+		status, err := s.kube.FindClusterStatus(ctx, ref)
 		if err != nil {
 			return err
 		}
