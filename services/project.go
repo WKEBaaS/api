@@ -255,6 +255,11 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 		errors = append(errors, err)
 	}
 
+	err = s.kube.DeleteIngressRoute(ctx, in.Reference)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
 	err = s.kube.DeleteAuthAPIDeployment(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
