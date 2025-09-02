@@ -8,6 +8,7 @@ import (
 	"baas-api/services"
 	"baas-api/services/kube_project"
 	"context"
+	"log"
 	"reflect"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func init() {
@@ -44,6 +48,23 @@ func init() {
 	_, _ = di.RegisterBeanFactory("cache", di.Singleton, func(ctx context.Context) (any, error) {
 		return cache.New(15*time.Minute, 20*time.Minute), nil
 	})
+
+	//////////// Kubernetes //////////
+	kc, err := clientcmd.BuildConfigFromFlags("", cfg.Kube.ConfigPath)
+	if err != nil {
+		log.Panicf("Failed to build kube config %+v", err)
+	}
+	clientset, err := kubernetes.NewForConfig(kc)
+	if err != nil {
+		log.Panicf("Failed to create kube client %+v", err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(kc)
+	if err != nil {
+		log.Panicf("Failed to create dynamic client %+v", err)
+	}
+	_, _ = di.RegisterBeanInstance("kubeConfig", kc)
+	_, _ = di.RegisterBeanInstance("kubeClientset", clientset)
+	_, _ = di.RegisterBeanInstance("kubeDynamicClient", dynamicClient)
 
 	//////////// Repositories //////////
 	_, _ = di.RegisterBean("entityRepository", reflect.TypeOf((*repo.EntityRepository)(nil)))

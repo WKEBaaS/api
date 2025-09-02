@@ -64,7 +64,7 @@ func (r *KubeProjectService) CreateRESTAPIDeployment(ctx context.Context, ref st
 						},
 						{
 							Name:  openapiContainerName,
-							Image: "scalarapi/api-reference:0.4.2",
+							Image: "scalarapi/api-reference:0.2.25",
 							Ports: []corev1.ContainerPort{{
 								ContainerPort: 8080,
 							}},

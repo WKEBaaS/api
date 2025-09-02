@@ -5,8 +5,10 @@ import (
 	"baas-api/controllers/middlewares"
 	"baas-api/dto"
 	"baas-api/services"
+	"baas-api/services/kube_project"
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/sse"
@@ -25,8 +27,9 @@ type ProjectControllerInterface interface {
 }
 
 type ProjectController struct {
-	config         *config.Config                   `di.inject:"config"`
-	projectService services.ProjectServiceInterface `di.inject:"projectService"`
+	config         *config.Config                           `di.inject:"config"`
+	kubeProject    kube_project.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
+	projectService services.ProjectServiceInterface         `di.inject:"projectService"`
 }
 
 func NewProjectController() ProjectControllerInterface {
@@ -199,10 +202,21 @@ func (c *ProjectController) createProject(ctx context.Context, in *dto.CreatePro
 		return nil, err
 	}
 
-	out, err := c.projectService.CreateProject(ctx, in, &session.UserID)
+	out, internalOut, err := c.projectService.CreateProject(ctx, in, &session.UserID)
 	if err != nil {
 		return nil, err
 	}
+
+	go func() {
+		postCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		err := c.kubeProject.WaitClusterHealthy(postCtx, out.Body.Reference)
+		if err != nil {
+			return
+		}
+		c.projectService.CreateProjectPostInstall(postCtx, out.Body.Reference, internalOut.AuthSecret, internalOut.JWKSPublicKey)
+	}()
+
 	return out, nil
 }
 

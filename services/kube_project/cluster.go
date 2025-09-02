@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -81,4 +82,22 @@ func (r *KubeProjectService) FindClusterStatus(ctx context.Context, ref string) 
 	}
 
 	return &phase, nil
+}
+
+func (s *KubeProjectService) WaitClusterHealthy(ctx context.Context, ref string) error {
+	ticker := time.NewTicker(5 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			status, err := s.FindClusterStatus(ctx, ref)
+			if err != nil {
+				return err
+			}
+			if *status == "Cluster in healthy state" {
+				return nil
+			}
+		}
+	}
 }

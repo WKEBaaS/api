@@ -43,6 +43,14 @@ func (r *KubeProjectService) GetRESTAPIURL(ref string) string {
 	return u.String()
 }
 
+func (r *KubeProjectService) GetJWKSConfigMapName(ref string) string {
+	return generateResourceName(ref, "jwks")
+}
+
+func (r *KubeProjectService) GetMigrationJobName(ref string) string {
+	return generateResourceName(ref, "migration")
+}
+
 func (*KubeProjectService) GetAuthAPIDeploymentName(ref string) string {
 	return generateResourceName(ref, AuthAPIComponent)
 }
@@ -61,7 +69,7 @@ func (*KubeProjectService) GetRESTAPIDeploymentName(ref string) string {
 }
 
 func (*KubeProjectService) GetRESTAPIContainerName(ref string, component string) string {
-	return generateResourceName(ref, RestAPIComponent)
+	return generateResourceName(ref, RestAPIComponent, component)
 }
 
 func (*KubeProjectService) GetRESTAPIServiceName(ref string) string {
@@ -90,7 +98,7 @@ func (*KubeProjectService) GetDBIngressRouteTCPName(ref string) string {
 }
 
 func (*KubeProjectService) GetDatabaseRoleSecretName(ref string, role string) string {
-	return generateResourceName(ref, "db", role)
+	return generateResourceName(ref, role)
 }
 
 func generateResourceName(parts ...string) string {

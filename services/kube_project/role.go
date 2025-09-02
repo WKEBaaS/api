@@ -82,3 +82,13 @@ func (r *KubeProjectService) FindDatabaseRolePassword(ctx context.Context, ref s
 	password := string(passwordBytes)
 	return &password, nil
 }
+
+func (s *KubeProjectService) DeleteDatabaseRoleSecret(ctx context.Context, ref string, role string) error {
+	secretName := s.GetDatabaseRoleSecretName(ref, role)
+	err := s.clientset.CoreV1().Secrets(s.namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+	if err != nil {
+		slog.Error("Failed to delete database role secret", "error", err, "secretName", secretName)
+		return fmt.Errorf("failed to delete database role secret")
+	}
+	return nil
+}

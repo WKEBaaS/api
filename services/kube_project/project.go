@@ -16,19 +16,26 @@ import (
 
 type KubeProjectServiceInterface interface {
 	// === 基礎設施層 ===
+	// Prepare Cluster Required Resources
+	CreateJWKSConfigMap(ctx context.Context, ref string, publicKey string, privateKey string) error
+	DeleteJWKSConfigMap(ctx context.Context, ref string) error
+
 	// CNPG Cluster 管理
 	CreateCluster(ctx context.Context, ref string, storageSize string) error
 	DeleteCluster(ctx context.Context, ref string) error
 	FindClusterStatus(ctx context.Context, ref string) (*string, error)
+	WaitClusterHealthy(ctx context.Context, ref string) error
 
 	// Database Management
 	CreateDatabase(ctx context.Context, ref string) error
 	DeleteDatabase(ctx context.Context, ref string) error
+	CreateMigrationJob(ctx context.Context, ref string) error
 
 	// Database Role Management
 	FindDatabaseRolePassword(ctx context.Context, ref, role string) (*string, error)
 	CreateDatabaseRoleSecret(ctx context.Context, ref, role, password string) error
 	UpdateDatabaseRoleSecret(ctx context.Context, ref, role, password string) error
+	DeleteDatabaseRoleSecret(ctx context.Context, ref string, role string) error
 
 	// === 應用層 ===
 	// Auth API
@@ -51,11 +58,16 @@ type KubeProjectServiceInterface interface {
 }
 
 type KubeProjectService struct {
-	kubeConfig    *rest.Config
-	clientset     *kubernetes.Clientset
-	dynamicClient *dynamic.DynamicClient
-	config        *config.Config
+	kubeConfig    *rest.Config           `di.inject:"kubeConfig"`
+	clientset     *kubernetes.Clientset  `di.inject:"kubeClientset"`
+	dynamicClient *dynamic.DynamicClient `di.inject:"kubeDynamicClient"`
+	config        *config.Config         `di.inject:"config"`
 	namespace     string
+}
+
+func (s *KubeProjectService) PostConstruct() error {
+	s.namespace = s.config.Kube.Project.Namespace
+	return nil
 }
 
 func NewKubeProjectService(config *config.Config) KubeProjectServiceInterface {

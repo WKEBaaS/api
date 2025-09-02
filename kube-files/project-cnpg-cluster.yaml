@@ -4,6 +4,11 @@ metadata:
   name: <project_ref>
   namespace: <project_namespace>
 spec:
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql
+    major: 18
   instances: 1
   managed:
     services:
@@ -36,23 +41,5 @@ spec:
     initdb:
       database: app
       owner: app
-      postInitApplicationSQLRefs:
-        configMapRefs:
-          - name: migrations
-            key: 000001_init.sql
-          - name: migrations
-            key: 000002_nanoid.sql
-          - name: migrations
-            key: 000003_auth.sql
-          - name: migrations
-            key: 000004_dbo.sql
-          - name: migrations
-            key: 000005_dbo_fn.sql
-          - name: migrations
-            key: 000006_dbo_tuples.sql
-          - name: migrations
-            key: 000007_dbo_api.sql
-          - name: migrations
-            key: 000008_auth_api.sql
   storage:
     size: 1Gi

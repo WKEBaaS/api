@@ -107,7 +107,7 @@ func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, ref stri
 	serviceName := fmt.Sprintf("%s-rw", ref)
 	unstructured.SetNestedSlice(ingressRouteTCPUnstructured.Object, []any{
 		map[string]any{
-			"match": fmt.Sprintf("Host(`%s`))", projectHost),
+			"match": fmt.Sprintf("HostSNI(`%s`)", projectHost),
 			"services": []any{
 				map[string]any{
 					"name": serviceName,

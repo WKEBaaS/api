@@ -6,16 +6,31 @@ import (
 	"baas-api/models"
 	"baas-api/repo"
 	"baas-api/services/kube_project"
+	"baas-api/utils"
 	"context"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/samber/lo"
 )
 
+type CreateProjectInternalOutput struct {
+	AuthSecret    string
+	JWKSPublicKey string
+}
+
 type ProjectServiceInterface interface {
-	CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error)
+	// CreateProject
+	//
+	// Returns dto.CreateProjectOutput, project's auth-secret, error
+	CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error)
+	// CreateProjectPostInstall performs post-installation steps after the project's cluster is read.
+	CreateProjectPostInstall(ctx context.Context, ref string, authSecret string, jwks string) error
+	GetProjectJWKS(ctx context.Context, ref string) (*string, error)
 	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
 	PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
@@ -38,10 +53,10 @@ func NewProjectService() ProjectServiceInterface {
 	return service
 }
 
-func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, error) {
+func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error) {
 	projectEntity, err := s.entity.GetByChineseName(ctx, "專案")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Cleanup if any error occurs
@@ -60,7 +75,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	id, ref, err := s.project.Create(ctx, in.Body.Name, in.Body.Description, projectEntity.ID, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.project.DeleteByID(ctx, *id)
@@ -71,15 +86,28 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	}
 	err = s.projectAuthSetting.Create(ctx, projectAuthSetting)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id)
 	})
 
+	///// Create Kubernetes resources /////
+	publicKey, privateKey, err := utils.NewEd25519JWKStringified(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = s.kube.CreateJWKSConfigMap(ctx, *ref, publicKey, privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.kube.DeleteJWKSConfigMap(ctx, *ref)
+	})
+
 	err = s.kube.CreateCluster(ctx, *ref, in.Body.StorageSize)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.kube.DeleteCluster(ctx, *ref)
@@ -87,7 +115,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	err = s.kube.CreateDatabase(ctx, *ref)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.kube.DeleteDatabase(ctx, *ref)
@@ -103,47 +131,10 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	}
 	_, err = s.projectAuthSetting.CreateOAuthProvider(ctx, emailPasswordProvider)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
 		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id) // This will cascade delete OAuth providers
-	})
-
-	err = s.kube.CreateAuthAPIDeployment(ctx,
-		*ref,
-		kube_project.NewAPIDeploymentOption().
-			WithBetterAuthSecret(projectAuthSetting.Secret).
-			WithEmailAndPasswordAuth(true),
-	)
-	if err != nil {
-		return nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteAuthAPIDeployment(ctx, *ref)
-	})
-
-	err = s.kube.CreateAuthAPIService(ctx, *ref)
-	if err != nil {
-		return nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteAuthAPIService(ctx, *ref)
-	})
-
-	err = s.kube.CreateIngressRoute(ctx, *ref)
-	if err != nil {
-		return nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteIngressRoute(ctx, *ref)
-	})
-
-	err = s.kube.CreateIngressRouteTCP(ctx, *ref)
-	if err != nil {
-		return nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteIngressRouteTCP(ctx, *ref)
 	})
 
 	success = true // Mark as successful if we reach here without errors
@@ -151,7 +142,86 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	out.Body.ID = *id
 	out.Body.Reference = *ref
 
-	return out, nil
+	internalOut := &CreateProjectInternalOutput{}
+	internalOut.AuthSecret = projectAuthSetting.Secret
+	internalOut.JWKSPublicKey = publicKey
+
+	return out, internalOut, nil
+}
+
+func (s *ProjectService) CreateProjectPostInstall(ctx context.Context, ref string, authSecret string, jwks string) error {
+	password := utils.GenerateNewPassword(16)
+	err := s.kube.CreateDatabaseRoleSecret(ctx, ref, kube_project.RoleAuthenticator, password)
+	if err != nil {
+		return err
+	}
+
+	err = s.kube.CreateMigrationJob(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	err = s.kube.CreateAuthAPIDeployment(ctx, ref,
+		kube_project.NewAPIDeploymentOption().
+			WithBetterAuthSecret(authSecret).
+			WithEmailAndPasswordAuth(true),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.kube.CreateAuthAPIService(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	err = s.kube.CreateRESTAPIDeployment(ctx, ref, jwks)
+	if err != nil {
+		return err
+	}
+
+	err = s.kube.CreateIngressRoute(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	err = s.kube.CreateIngressRouteTCP(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *ProjectService) GetProjectJWKS(ctx context.Context, ref string) (*string, error) {
+	jwksURL := url.URL{
+		Scheme: "https",
+		Host:   ref + "." + s.config.App.ExternalDomain,
+		Path:   "/api/auth/jwks",
+	}
+
+	req, err := http.NewRequest(http.MethodGet, jwksURL.String(), nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to create request for JWKS", "error", err)
+		return nil, huma.Error500InternalServerError("Failed to create request for JWKS")
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get JWKS", "error", err)
+		return nil, huma.Error500InternalServerError("Failed to get JWKS")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.ErrorContext(ctx, "Failed to get JWKS", "status", resp.StatusCode)
+		return nil, huma.Error500InternalServerError("Failed to get JWKS")
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	jwks := string(body)
+	return &jwks, nil
 }
 
 func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
@@ -186,6 +256,21 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 	}
 
 	err = s.kube.DeleteAuthAPIDeployment(ctx, in.Reference)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	err = s.kube.DeleteRESTAPIDeployment(ctx, in.Reference)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	err = s.kube.DeleteDatabaseRoleSecret(ctx, in.Reference, kube_project.RoleAuthenticator)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	err = s.kube.DeleteJWKSConfigMap(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -315,35 +400,42 @@ func (s *ProjectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 		return huma.Error400BadRequest("Project already initialized")
 	}
 
-	totalStep := 4
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		status, err := s.kube.FindClusterStatus(ctx, ref)
-		if err != nil {
-			return err
+		select {
+		case <-ctx.Done():
+			c <- dto.ProjectStatusEvent{Message: "Operation cancelled by client.", Step: -1, TotalStep: 4}
+			return ctx.Err()
+		case <-ticker.C:
+			totalStep := 4
+			status, err := s.kube.FindClusterStatus(ctx, ref)
+			if err != nil {
+				return err
+			}
+			if status == nil {
+				c <- dto.ProjectStatusEvent{Message: "Postgres cluster is not ready yet.", Step: 0, TotalStep: totalStep}
+			}
+			switch *status {
+			case "Initializing Postgres cluster":
+				c <- dto.ProjectStatusEvent{Message: "Postgres cluster is initializing...", Step: 1, TotalStep: totalStep}
+			case "Setting up primary":
+				c <- dto.ProjectStatusEvent{Message: "Postgres cluster is setting up primary...", Step: 2, TotalStep: totalStep}
+			case "Waiting for the instances to become active":
+				c <- dto.ProjectStatusEvent{Message: "Postgres Waiting for the instances to become active", Step: 3, TotalStep: totalStep}
+			case "Cluster in healthy state":
+				s.project.UpdateByRef(ctx, ref, &models.Project{
+					InitializedAt: lo.ToPtr(time.Now()),
+				}, models.Object{
+					UpdatedAt: time.Now(),
+				})
+				c <- dto.ProjectStatusEvent{Message: "Postgres cluster is ready.", Step: 4, TotalStep: totalStep}
+				return nil
+			default:
+				slog.Warn("Unknown Postgres cluster status", "status", *status)
+			}
 		}
-		if status == nil {
-			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is not ready yet.", Step: 0, TotalStep: totalStep}
-			continue
-		}
-		switch *status {
-		case "Initializing Postgres cluster":
-			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is initializing...", Step: 1, TotalStep: totalStep}
-		case "Setting up primary":
-			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is setting up primary...", Step: 2, TotalStep: totalStep}
-		case "Waiting for the instances to become active":
-			c <- dto.ProjectStatusEvent{Message: "Postgres Waiting for the instances to become active", Step: 3, TotalStep: totalStep}
-		case "Cluster in healthy state":
-			s.project.UpdateByRef(ctx, ref, &models.Project{
-				InitializedAt: lo.ToPtr(time.Now()),
-			}, models.Object{
-				UpdatedAt: time.Now(),
-			})
-			c <- dto.ProjectStatusEvent{Message: "Postgres cluster is ready.", Step: 4, TotalStep: totalStep}
-			return nil
-		default:
-			slog.Warn("Unknown Postgres cluster status", "status", *status)
-		}
-		time.Sleep(time.Second * 1)
 	}
 }
 
