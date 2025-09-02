@@ -10,9 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref string) error {
-	serviceName := r.GetAuthAPIServiceName(ref)
-	deploymentName := r.GetAuthAPIDeploymentName(ref)
+func (r *KubeProjectService) CreateRESTAPIService(ctx context.Context, ref string) error {
+	serviceName := r.GetRESTAPIServiceName(ref)
+	deploymentName := r.GetRESTAPIDeploymentName(ref)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -25,9 +25,15 @@ func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref strin
 			},
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "http",
+					Name:       "postgrest",
 					Port:       3000,
 					TargetPort: intstr.FromInt(3000),
+					Protocol:   corev1.ProtocolTCP,
+				},
+				{
+					Name:       "openapi",
+					Port:       8080,
+					TargetPort: intstr.FromInt(8080),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
@@ -36,20 +42,20 @@ func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref strin
 
 	_, err := r.clientset.CoreV1().Services(r.namespace).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to create Auth API service", "error", err)
-		return errors.New("failed to create Auth API service")
+		slog.ErrorContext(ctx, "Failed to create REST(pgrst) API service", "error", err)
+		return errors.New("failed to create REST(pgrst) API service")
 	}
 
 	return nil
 }
 
-func (r *KubeProjectService) DeleteAuthAPIService(ctx context.Context, ref string) error {
-	serviceName := r.GetAuthAPIServiceName(ref)
+func (r *KubeProjectService) DeleteRESTAPIService(ctx context.Context, ref string) error {
+	serviceName := r.GetRESTAPIServiceName(ref)
 
 	err := r.clientset.CoreV1().Services(r.namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to delete Auth API service", "error", err)
-		return errors.New("failed to delete Auth API service")
+		slog.ErrorContext(ctx, "Failed to delete REST(pgrst) API service", "error", err)
+		return errors.New("failed to delete REST(pgrst) API service")
 	}
 
 	return nil

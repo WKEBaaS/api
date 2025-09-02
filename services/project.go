@@ -105,6 +105,15 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		_ = s.kube.DeleteJWKSConfigMap(ctx, *ref)
 	})
 
+	password := utils.GenerateNewPassword(16)
+	err = s.kube.CreateDatabaseRoleSecret(ctx, *ref, kube_project.RoleAuthenticator, password)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.kube.DeleteDatabaseRoleSecret(ctx, *ref, kube_project.RoleAuthenticator)
+	})
+
 	err = s.kube.CreateCluster(ctx, *ref, in.Body.StorageSize)
 	if err != nil {
 		return nil, nil, err
@@ -150,12 +159,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 }
 
 func (s *ProjectService) CreateProjectPostInstall(ctx context.Context, ref string, authSecret string, jwks string) error {
-	password := utils.GenerateNewPassword(16)
-	err := s.kube.CreateDatabaseRoleSecret(ctx, ref, kube_project.RoleAuthenticator, password)
-	if err != nil {
-		return err
-	}
-
+	var err error
 	err = s.kube.CreateMigrationJob(ctx, ref)
 	if err != nil {
 		return err
@@ -170,12 +174,17 @@ func (s *ProjectService) CreateProjectPostInstall(ctx context.Context, ref strin
 		return err
 	}
 
+	err = s.kube.CreateRESTAPIDeployment(ctx, ref, jwks)
+	if err != nil {
+		return err
+	}
+
 	err = s.kube.CreateAuthAPIService(ctx, ref)
 	if err != nil {
 		return err
 	}
 
-	err = s.kube.CreateRESTAPIDeployment(ctx, ref, jwks)
+	err = s.kube.CreateRESTAPIService(ctx, ref)
 	if err != nil {
 		return err
 	}
@@ -235,17 +244,19 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 
 	var errors []error
 
+	///// Delete database records /////
+	err = s.project.DeleteByRef(ctx, in.Reference)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	///// Delete Kubernetes resources /////
 	err = s.kube.DeleteCluster(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
 	err = s.kube.DeleteDatabase(ctx, in.Reference)
-	if err != nil {
-		errors = append(errors, err)
-	}
-
-	err = s.project.DeleteByRef(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -266,6 +277,15 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteP
 	}
 
 	err = s.kube.DeleteRESTAPIDeployment(ctx, in.Reference)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	err = s.kube.DeleteAuthAPIService(ctx, in.Reference)
+	if err != nil {
+		errors = append(errors, err)
+	}
+	err = s.kube.DeleteRESTAPIService(ctx, in.Reference)
 	if err != nil {
 		errors = append(errors, err)
 	}

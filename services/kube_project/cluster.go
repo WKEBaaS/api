@@ -4,10 +4,13 @@
 package kube_project
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
 	"os"
+	"strings"
+	"text/template"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,26 +19,40 @@ import (
 )
 
 func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, storageSize string) error {
-	pgClusterYAML, err := os.Open("kube-files/project-cnpg-cluster.yaml")
+	clusterYAML, err := os.ReadFile("kube-files/project-cnpg-cluster.yaml")
 	if err != nil {
 		slog.Error("Failed to open Postgres cluster YAML file", "error", err)
 		return ErrFailedToOpenPostgresClusterYAML
 	}
-	defer pgClusterYAML.Close()
 
-	pgClusterUnstructured := &unstructured.Unstructured{}
-	decoder := yaml.NewYAMLOrJSONDecoder(pgClusterYAML, 1024)
-	if err := decoder.Decode(pgClusterUnstructured); err != nil {
+	pgClusterYAMLString := string(clusterYAML)
+	clusterData := map[string]any{
+		"RoleAuthenticatorSecretName": r.GetDatabaseRoleSecretName(ref, RoleAuthenticator),
+	}
+	clusterTmpl, err := template.New("yaml").Parse(pgClusterYAMLString)
+	if err != nil {
+		slog.Error("Failed to parse Postgres cluster YAML template", "error", err)
+		return errors.New("failed to parse Postgres cluster YAML template")
+	}
+	var clusterRendered bytes.Buffer
+	if err := clusterTmpl.Execute(&clusterRendered, clusterData); err != nil {
+		slog.Error("Failed to execute Postgres cluster YAML template", "error", err)
+		return errors.New("failed to execute Postgres cluster YAML template")
+	}
+
+	cluster := &unstructured.Unstructured{}
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(clusterRendered.String()), 1024)
+	if err := decoder.Decode(cluster); err != nil {
 		slog.Error("Failed to decode Postgres cluster YAML", "error", err)
 		return ErrFailedToDecodePostgresClusterYAML
 	}
 
 	// set metadata
-	pgClusterUnstructured.SetName(ref)
-	pgClusterUnstructured.SetNamespace(r.namespace)
+	cluster.SetName(ref)
+	cluster.SetNamespace(r.namespace)
 
 	// set spec.storage.size
-	if err := unstructured.SetNestedField(pgClusterUnstructured.Object, storageSize, "spec", "storage", "size"); err != nil {
+	if err := unstructured.SetNestedField(cluster.Object, storageSize, "spec", "storage", "size"); err != nil {
 		slog.Error("Failed to set storage size in Postgres cluster spec", "error", err)
 		return ErrFailedToSetSpecStorageSize
 	}
@@ -43,7 +60,7 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, stor
 	// 使用 dynamicClient 創建資源
 	_, err = r.dynamicClient.Resource(clusterGVR).
 		Namespace(r.namespace).
-		Create(ctx, pgClusterUnstructured, metav1.CreateOptions{})
+		Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create Postgres cluster", "error", err)
 		return ErrFailedToCreatePostgresCluster

@@ -28,7 +28,7 @@ func (r *KubeProjectService) buildDatabaseRoleSecret(ref string, role string, pa
 		StringData: map[string]string{
 			"username": role,
 			"password": password,
-			"uri":      fmt.Sprintf("postgresql://%s:%s@%s-db-rw:5432/app", role, password, ref),
+			"uri":      fmt.Sprintf("postgresql://%s:%s@%s-rw:5432/app", role, password, ref),
 		},
 	}
 }

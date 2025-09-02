@@ -37,15 +37,40 @@ func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, ref string)
 
 	// set spec.routes[0]
 	projectHost := r.GenProjectHost(ref)
-	serviceName := r.GetAuthAPIServiceName(ref)
+	authServiceName := r.GetAuthAPIServiceName(ref)
+	restServiceName := r.GetRESTAPIServiceName(ref)
 	unstructured.SetNestedSlice(ingressRouteUnstructured.Object, []any{
 		map[string]any{
 			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/auth`)", projectHost),
 			"services": []any{
 				map[string]any{
-					"name": serviceName,
+					"name": authServiceName,
 					"port": int64(3000),
 				},
+			},
+		},
+		map[string]any{
+			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/rest`)", projectHost),
+			"services": []any{
+				map[string]any{
+					"name": restServiceName,
+					"port": int64(3000),
+				},
+			},
+			"middlewares": []any{
+				map[string]any{"name": "baas-pgrst-strip-prefix"},
+			},
+		},
+		map[string]any{
+			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/rest/docs`)", projectHost),
+			"services": []any{
+				map[string]any{
+					"name": restServiceName,
+					"port": int64(8080),
+				},
+			},
+			"middlewares": []any{
+				map[string]any{"name": "baas-pgrst-strip-prefix"},
 			},
 		},
 	}, "spec", "routes")

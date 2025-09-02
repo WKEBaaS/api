@@ -80,7 +80,7 @@ func (*KubeProjectService) GenerateScalarAPIConfig(source string) string {
 	config := fmt.Sprintf(`{
 	"sources": [
 		{
-			"url": %s
+			"url": "%s"
 		}
 	],
 	"theme": "purple"

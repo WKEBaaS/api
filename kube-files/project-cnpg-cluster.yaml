@@ -32,7 +32,7 @@ spec:
         comment: PostgREST Authenticator
         login: true
         passwordSecret:
-          name: baas-db-authenticator
+          name: "{{ .RoleAuthenticatorSecretName }}"
         inRoles:
           - anon
           - authenticated

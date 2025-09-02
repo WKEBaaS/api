@@ -48,6 +48,8 @@ type KubeProjectServiceInterface interface {
 	// REST API (PostgREST)
 	CreateRESTAPIDeployment(ctx context.Context, ref string, jwks string) error
 	DeleteRESTAPIDeployment(ctx context.Context, ref string) error
+	CreateRESTAPIService(ctx context.Context, ref string) error
+	DeleteRESTAPIService(ctx context.Context, ref string) error
 
 	// === 網路層 ===
 	// Ingress for REST API (PostgREST) and Auth API
