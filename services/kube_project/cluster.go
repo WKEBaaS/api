@@ -25,11 +25,11 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, stor
 		return ErrFailedToOpenPostgresClusterYAML
 	}
 
-	pgClusterYAMLString := string(clusterYAML)
+	clusterYAMLString := string(clusterYAML)
 	clusterData := map[string]any{
 		"RoleAuthenticatorSecretName": r.GetDatabaseRoleSecretName(ref, RoleAuthenticator),
 	}
-	clusterTmpl, err := template.New("yaml").Parse(pgClusterYAMLString)
+	clusterTmpl, err := template.New("yaml").Parse(clusterYAMLString)
 	if err != nil {
 		slog.Error("Failed to parse Postgres cluster YAML template", "error", err)
 		return errors.New("failed to parse Postgres cluster YAML template")

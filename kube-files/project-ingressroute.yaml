@@ -7,9 +7,23 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`<project_ref>.<baas_domain>`) && PathPrefix(`/api/auth`)
+    - match: Host(`{{ .ProjectHost }}`) && PathPrefix(`/api/auth`)
       services:
-        - name: <project_ref>-api-service
+        - name: "{{ .AuthServiceName }}"
           port: 5432
+    - match: Host(`{{ .ProjectHost }}`) && PathPrefix(`/api/rest/docs`)
+      kind: Rule
+      services:
+        - name: "{{ .RESTServiceName }}"
+          port: 8080
+      middlewares:
+        - name: baas-pgrst-strip-prefix
+    - match: Host(`{{ .ProjectHost }}`) && PathPrefix(`/api/rest`)
+      kind: Rule
+      services:
+        - name: "{{ .RESTServiceName }}"
+          port: 3000
+      middlewares:
+        - name: baas-pgrst-strip-prefix
   tls:
-    secretName: baas-wildcard-tls
+    secretName: "{{ .TLSSecretName }}"

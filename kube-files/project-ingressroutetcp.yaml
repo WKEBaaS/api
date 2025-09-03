@@ -7,9 +7,9 @@ spec:
   entryPoints:
     - postgres
   routes:
-    - match: HostSNI(`<project_ref>.<baas_host>`)
+    - match: HostSNI(`{{ .ProjectHost }}`)
       services:
-        - name: <project_ref>-rw
+        - name: "{{ .ProjectDBServiceName }}"
           port: 5432
   tls:
-    secretName: baas-wildcard-tls
+    secretName: "{{ .TLSSecretName }}"

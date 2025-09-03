@@ -21,14 +21,14 @@ const (
 )
 
 // ===== Auth API =====
-func (r *KubeProjectService) GenProjectHost(ref string) string {
+func (r *KubeProjectService) GetProjectHost(ref string) string {
 	return ref + "." + r.config.App.ExternalDomain
 }
 
 func (r *KubeProjectService) GetAuthAPIURL(ref string) string {
 	u := url.URL{
 		Scheme: "https",
-		Host:   r.GenProjectHost(ref),
+		Host:   r.GetProjectHost(ref),
 		Path:   "/api/auth",
 	}
 	return u.String()
@@ -37,7 +37,7 @@ func (r *KubeProjectService) GetAuthAPIURL(ref string) string {
 func (r *KubeProjectService) GetRESTAPIURL(ref string) string {
 	u := url.URL{
 		Scheme: "https",
-		Host:   r.GenProjectHost(ref),
+		Host:   r.GetProjectHost(ref),
 		Path:   "/api/rest",
 	}
 	return u.String()
@@ -99,6 +99,10 @@ func (*KubeProjectService) GetDBIngressRouteTCPName(ref string) string {
 
 func (*KubeProjectService) GetDatabaseRoleSecretName(ref string, role string) string {
 	return generateResourceName(ref, role)
+}
+
+func (*KubeProjectService) GetDatabaseRWServiceName(ref string) string {
+	return generateResourceName(ref, "rw")
 }
 
 func generateResourceName(parts ...string) string {

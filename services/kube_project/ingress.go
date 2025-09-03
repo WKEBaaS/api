@@ -6,9 +6,10 @@ package kube_project
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
+	"strings"
+	"text/template"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,75 +17,46 @@ import (
 )
 
 func (r *KubeProjectService) CreateIngressRoute(ctx context.Context, ref string) error {
-	ingressRouteTCPYAML, err := os.Open("kube-files/project-ingressroute.yaml")
+	ingressYAML, err := os.ReadFile("kube-files/project-ingressroute.yaml")
 	if err != nil {
 		slog.Error("Failed to open IngressRoute YAML file", "error", err)
 		return errors.New("failed to open IngressRoute YAML file")
 	}
-	defer ingressRouteTCPYAML.Close()
 
-	ingressRouteUnstructured := &unstructured.Unstructured{}
-	decoder := yaml.NewYAMLOrJSONDecoder(ingressRouteTCPYAML, 1024)
-	if err := decoder.Decode(ingressRouteUnstructured); err != nil {
+	ingressYAMLString := string(ingressYAML)
+	ingressData := map[string]any{
+		"ProjectHost":     r.GetProjectHost(ref),
+		"AuthServiceName": r.GetAuthAPIServiceName(ref),
+		"RESTServiceName": r.GetRESTAPIServiceName(ref),
+		"TLSSecretName":   r.config.Kube.Project.TLSSecretName,
+	}
+	ingressTmpl, err := template.New("yaml").Parse(ingressYAMLString)
+	if err != nil {
+		slog.Error("Failed to parse IngressRoute YAML template", "error", err)
+		return errors.New("failed to parse IngressRoute YAML template")
+	}
+	var ingressRendered strings.Builder
+	if err := ingressTmpl.Execute(&ingressRendered, ingressData); err != nil {
+		slog.Error("Failed to execute IngressRoute YAML template", "error", err)
+		return errors.New("failed to execute IngressRoute YAML template")
+	}
+
+	ingressRoute := &unstructured.Unstructured{}
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(ingressRendered.String()), 1024)
+	if err := decoder.Decode(ingressRoute); err != nil {
 		slog.Error("Failed to decode IngressRoute YAML", "error", err)
 		return errors.New("failed to decode IngressRoute YAML")
 	}
 
 	// set metadata
 	ingressRouteName := r.GetAPIIngressRouteName(ref)
-	ingressRouteUnstructured.SetName(ingressRouteName)
-	ingressRouteUnstructured.SetNamespace(r.namespace)
-
-	// set spec.routes[0]
-	projectHost := r.GenProjectHost(ref)
-	authServiceName := r.GetAuthAPIServiceName(ref)
-	restServiceName := r.GetRESTAPIServiceName(ref)
-	unstructured.SetNestedSlice(ingressRouteUnstructured.Object, []any{
-		map[string]any{
-			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/auth`)", projectHost),
-			"services": []any{
-				map[string]any{
-					"name": authServiceName,
-					"port": int64(3000),
-				},
-			},
-		},
-		map[string]any{
-			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/rest`)", projectHost),
-			"services": []any{
-				map[string]any{
-					"name": restServiceName,
-					"port": int64(3000),
-				},
-			},
-			"middlewares": []any{
-				map[string]any{"name": "baas-pgrst-strip-prefix"},
-			},
-		},
-		map[string]any{
-			"match": fmt.Sprintf("Host(`%s`) && PathPrefix(`/api/rest/docs`)", projectHost),
-			"services": []any{
-				map[string]any{
-					"name": restServiceName,
-					"port": int64(8080),
-				},
-			},
-			"middlewares": []any{
-				map[string]any{"name": "baas-pgrst-strip-prefix"},
-			},
-		},
-	}, "spec", "routes")
-
-	// set spec.tls.secretName
-	if err := unstructured.SetNestedField(ingressRouteUnstructured.Object, r.config.Kube.Project.TLSSecretName, "spec", "tls", "secretName"); err != nil {
-		slog.Error("Failed to set TLS secret name in IngressRoute spec", "error", err)
-		return errors.New("failed to set TLS secret name in IngressRoute spec")
-	}
+	ingressRoute.SetName(ingressRouteName)
+	ingressRoute.SetNamespace(r.namespace)
 
 	// 使用 dynamicClient 創建資源
 	_, err = r.dynamicClient.Resource(ingressRouteGVR).
 		Namespace(r.namespace).
-		Create(ctx, ingressRouteUnstructured, metav1.CreateOptions{})
+		Create(ctx, ingressRoute, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create IngressRoute", "error", err)
 		return errors.New("failed to create IngressRoute")
@@ -108,15 +80,31 @@ func (r *KubeProjectService) DeleteIngressRoute(ctx context.Context, ref string)
 }
 
 func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, ref string) error {
-	ingressRouteTCPYAML, err := os.Open("kube-files/project-ingressroutetcp.yaml")
+	ingressTCPYAML, err := os.ReadFile("kube-files/project-ingressroutetcp.yaml")
 	if err != nil {
 		slog.Error("Failed to open IngressRouteTCP YAML file", "error", err)
 		return ErrFailedToOpenIngressRouteTCPYAML
 	}
-	defer ingressRouteTCPYAML.Close()
+
+	ingressTCPYAMLString := string(ingressTCPYAML)
+	ingressData := map[string]any{
+		"ProjectHost":          r.GetProjectHost(ref),
+		"ProjectDBServiceName": r.GetDatabaseRWServiceName(ref),
+		"TLSSecretName":        r.config.Kube.Project.TLSSecretName,
+	}
+	ingressTmpl, err := template.New("yaml").Parse(ingressTCPYAMLString)
+	if err != nil {
+		slog.Error("Failed to parse IngressRouteTCP YAML template", "error", err)
+		return errors.New("failed to parse IngressRouteTCP YAML template")
+	}
+	var ingressRendered strings.Builder
+	if err := ingressTmpl.Execute(&ingressRendered, ingressData); err != nil {
+		slog.Error("Failed to execute IngressRouteTCP YAML template", "error", err)
+		return errors.New("failed to execute IngressRouteTCP YAML template")
+	}
 
 	ingressRouteTCPUnstructured := &unstructured.Unstructured{}
-	decoder := yaml.NewYAMLOrJSONDecoder(ingressRouteTCPYAML, 1024)
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(ingressRendered.String()), 1024)
 	if err := decoder.Decode(ingressRouteTCPUnstructured); err != nil {
 		slog.Error("Failed to decode IngressRouteTCP YAML", "error", err)
 		return ErrFailedToDecodeIngressRouteTCPYAML
@@ -126,26 +114,6 @@ func (r *KubeProjectService) CreateIngressRouteTCP(ctx context.Context, ref stri
 	dbIngressRouteTCPName := r.GetDBIngressRouteTCPName(ref)
 	ingressRouteTCPUnstructured.SetName(dbIngressRouteTCPName)
 	ingressRouteTCPUnstructured.SetNamespace(r.namespace)
-
-	// set spec.routes[0]
-	projectHost := r.GenProjectHost(ref)
-	serviceName := fmt.Sprintf("%s-rw", ref)
-	unstructured.SetNestedSlice(ingressRouteTCPUnstructured.Object, []any{
-		map[string]any{
-			"match": fmt.Sprintf("HostSNI(`%s`)", projectHost),
-			"services": []any{
-				map[string]any{
-					"name": serviceName,
-					"port": int64(5432),
-				},
-			},
-		},
-	}, "spec", "routes")
-	// set spec.tls.secretName
-	if err := unstructured.SetNestedField(ingressRouteTCPUnstructured.Object, r.config.Kube.Project.TLSSecretName, "spec", "tls", "secretName"); err != nil {
-		slog.Error("Failed to set TLS secret name in IngressRouteTCP spec", "error", err)
-		return ErrFailedToSetSpecTLSSecretName
-	}
 
 	// 使用 dynamicClient 創建資源
 	_, err = r.dynamicClient.Resource(ingressRouteTCPGVR).
