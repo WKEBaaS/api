@@ -17,10 +17,26 @@ app:
 auth:
   url: "https://auth.example.com"
 
+# PostgREST service configuration.
+pgrest:
+  url: "https://postgrest.example.com"
+
 # Database connection configuration.
 database:
   # The full connection URL for the database (e.g., PostgreSQL, MySQL).
   url: "postgres://user:password@db.example.com:5432/my-app-db?sslmode=disable"
+
+s3:
+  # The endpoint URL for the S3-compatible storage service.
+  endpoint: "s3.example.com"
+  # Enable SSL for secure connections
+  useSSL: true
+  # The access key ID for S3 authentication
+  accessKeyID: "your-access-key"
+  # The secret access key for S3 authentication
+  secretAccessKey: "your-secret-key"
+  # The region where the S3 bucket is located.
+  region: "tw-1"
 
 # Kubernetes-specific configuration.
 kube:

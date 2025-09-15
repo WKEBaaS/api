@@ -5,14 +5,18 @@ import (
 	"baas-api/controllers"
 	"baas-api/repo"
 	"baas-api/router"
-	"baas-api/services"
 	"baas-api/services/kube_project"
+	"baas-api/services/pgrest"
+	"baas-api/services/project"
 	"context"
 	"log"
 	"reflect"
 	"time"
 
 	"github.com/goioc/di"
+	"github.com/minio/madmin-go/v4"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/patrickmn/go-cache"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -66,14 +70,33 @@ func init() {
 	_, _ = di.RegisterBeanInstance("kubeClientset", clientset)
 	_, _ = di.RegisterBeanInstance("kubeDynamicClient", dynamicClient)
 
+	//////////// S3 Clients //////////
+	minioClient, err := minio.New(cfg.S3.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.SecretAccessKey, ""),
+		Secure: cfg.S3.UseSSL,
+	})
+	if err != nil {
+		log.Panicf("Failed to create minio client %+v", err)
+	}
+	minioAdminClient, err := madmin.NewWithOptions(cfg.S3.Endpoint, &madmin.Options{
+		Creds:  credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.SecretAccessKey, ""),
+		Secure: cfg.S3.UseSSL,
+	})
+	if err != nil {
+		log.Panicf("Failed to create minio admin client %+v", err)
+	}
+	_, _ = di.RegisterBeanInstance("minioClient", minioClient)
+	_, _ = di.RegisterBeanInstance("minioAdminClient", minioAdminClient)
+
 	//////////// Repositories //////////
 	_, _ = di.RegisterBean("entityRepository", reflect.TypeOf((*repo.EntityRepository)(nil)))
 	_, _ = di.RegisterBean("projectRepository", reflect.TypeOf((*repo.ProjectRepository)(nil)))
 	_, _ = di.RegisterBean("projectAuthSettingRepository", reflect.TypeOf((*repo.ProjectAuthSettingRepository)(nil)))
 
 	//////////// Services //////////
+	_, _ = di.RegisterBean("pgrestService", reflect.TypeOf((*pgrest.PgRestService)(nil)))
 	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeOf((*kube_project.KubeProjectService)(nil)))
-	_, _ = di.RegisterBean("projectService", reflect.TypeOf((*services.ProjectService)(nil)))
+	_, _ = di.RegisterBean("projectService", reflect.TypeOf((*project.ProjectService)(nil)))
 
 	//////////// Controllers //////////
 	_, _ = di.RegisterBean("projectController", reflect.TypeOf((*controllers.ProjectController)(nil)))

@@ -1,4 +1,5 @@
-package services
+// Package project implements the project service for managing projects in the BaaS API.
+package project
 
 import (
 	"baas-api/config"
@@ -6,6 +7,7 @@ import (
 	"baas-api/models"
 	"baas-api/repo"
 	"baas-api/services/kube_project"
+	"baas-api/services/pgrest"
 	"baas-api/utils"
 	"context"
 	"io"
@@ -27,11 +29,11 @@ type ProjectServiceInterface interface {
 	// CreateProject
 	//
 	// Returns dto.CreateProjectOutput, project's auth-secret, error
-	CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error)
+	CreateProject(ctx context.Context, in *dto.CreateProjectInput, jwt string, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error)
 	// CreateProjectPostInstall performs post-installation steps after the project's cluster is read.
 	CreateProjectPostInstall(ctx context.Context, ref string, authSecret string, jwks string) error
 	GetProjectJWKS(ctx context.Context, ref string) (*string, error)
-	DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
+	DeleteProjectByRef(ctx context.Context, jwt string, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
 	PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
@@ -43,6 +45,7 @@ type ProjectServiceInterface interface {
 type ProjectService struct {
 	config             *config.Config                             `di.inject:"config"`
 	kube               kube_project.KubeProjectServiceInterface   `di.inject:"kubeProjectService"`
+	pgrest             pgrest.PgRestServiceInterface              `di.inject:"pgrestService"`
 	entity             repo.EntityRepositoryInterface             `di.inject:"entityRepository"`
 	project            repo.ProjectRepositoryInterface            `di.inject:"projectRepository"`
 	projectAuthSetting repo.ProjectAuthSettingRepositoryInterface `di.inject:"projectAuthSettingRepository"`
@@ -53,12 +56,7 @@ func NewProjectService() ProjectServiceInterface {
 	return service
 }
 
-func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error) {
-	projectEntity, err := s.entity.GetByChineseName(ctx, "專案")
-	if err != nil {
-		return nil, nil, err
-	}
-
+func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, jwt string, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error) {
 	// Cleanup if any error occurs
 	var cleanupFuncs []func()
 	var success bool
@@ -73,86 +71,58 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 		}
 	}()
 
-	id, ref, err := s.project.Create(ctx, in.Body.Name, in.Body.Description, projectEntity.ID, userID)
+	///// Create database records /////
+	project, err := s.pgrest.CreateProject(ctx, jwt, in.Body.Name, *in.Body.Description)
 	if err != nil {
 		return nil, nil, err
 	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.project.DeleteByID(ctx, *id)
-	})
-
-	projectAuthSetting := &models.ProjectSettings{
-		ProjectID: *id,
-	}
-	err = s.projectAuthSetting.Create(ctx, projectAuthSetting)
-	if err != nil {
-		return nil, nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id)
-	})
 
 	///// Create Kubernetes resources /////
+	ref := project.Ref
 	publicKey, privateKey, err := utils.NewEd25519JWKStringified(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = s.kube.CreateJWKSConfigMap(ctx, *ref, publicKey, privateKey)
+	err = s.kube.CreateJWKSConfigMap(ctx, ref, publicKey, privateKey)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteJWKSConfigMap(ctx, *ref)
+		_ = s.kube.DeleteJWKSConfigMap(ctx, ref)
 	})
 
 	password := utils.GenerateNewPassword(16)
-	err = s.kube.CreateDatabaseRoleSecret(ctx, *ref, kube_project.RoleAuthenticator, password)
+	err = s.kube.CreateDatabaseRoleSecret(ctx, ref, kube_project.RoleAuthenticator, password)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteDatabaseRoleSecret(ctx, *ref, kube_project.RoleAuthenticator)
+		_ = s.kube.DeleteDatabaseRoleSecret(ctx, ref, kube_project.RoleAuthenticator)
 	})
 
-	err = s.kube.CreateCluster(ctx, *ref, in.Body.StorageSize)
+	err = s.kube.CreateCluster(ctx, ref, in.Body.StorageSize)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteCluster(ctx, *ref)
+		_ = s.kube.DeleteCluster(ctx, ref)
 	})
 
-	err = s.kube.CreateDatabase(ctx, *ref)
+	err = s.kube.CreateDatabase(ctx, ref)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteDatabase(ctx, *ref)
-	})
-
-	// Create default email/password provider
-	emailPasswordProvider := &models.ProjectAuthProvider{
-		Name:         "email",
-		ProjectID:    *id,
-		Enabled:      true,
-		ClientID:     "",
-		ClientSecret: "",
-	}
-	_, err = s.projectAuthSetting.CreateOAuthProvider(ctx, emailPasswordProvider)
-	if err != nil {
-		return nil, nil, err
-	}
-	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.projectAuthSetting.DeleteByProjectID(ctx, *id) // This will cascade delete OAuth providers
+		_ = s.kube.DeleteDatabase(ctx, ref)
 	})
 
 	success = true // Mark as successful if we reach here without errors
 	out := &dto.CreateProjectOutput{}
-	out.Body.ID = *id
-	out.Body.Reference = *ref
+	out.Body.ID = project.ID
+	out.Body.Reference = project.Ref
 
 	internalOut := &CreateProjectInternalOutput{}
-	internalOut.AuthSecret = projectAuthSetting.Secret
+	internalOut.AuthSecret = project.AuthSecret
 	internalOut.JWKSPublicKey = publicKey
 
 	return out, internalOut, nil
@@ -233,69 +203,61 @@ func (s *ProjectService) GetProjectJWKS(ctx context.Context, ref string) (*strin
 	return &jwks, nil
 }
 
-func (s *ProjectService) DeleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
-	project, err := s.project.FindByRef(ctx, in.Reference)
-	if err != nil {
-		return nil, err
-	}
-	if project.OwnerID != userID {
-		return nil, huma.Error401Unauthorized("Unauthorized")
-	}
-
+func (s *ProjectService) DeleteProjectByRef(ctx context.Context, jwt string, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
 	var errors []error
 
 	///// Delete database records /////
-	err = s.project.DeleteByRef(ctx, in.Reference)
+	ref, err := s.pgrest.DeleteProject(ctx, jwt, in.ID)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
 	///// Delete Kubernetes resources /////
-	err = s.kube.DeleteCluster(ctx, in.Reference)
+	err = s.kube.DeleteCluster(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteDatabase(ctx, in.Reference)
+	err = s.kube.DeleteDatabase(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteIngressRouteTCP(ctx, in.Reference)
+	err = s.kube.DeleteIngressRouteTCP(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteIngressRoute(ctx, in.Reference)
+	err = s.kube.DeleteIngressRoute(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteAuthAPIDeployment(ctx, in.Reference)
+	err = s.kube.DeleteAuthAPIDeployment(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteRESTAPIDeployment(ctx, in.Reference)
+	err = s.kube.DeleteRESTAPIDeployment(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteAuthAPIService(ctx, in.Reference)
+	err = s.kube.DeleteAuthAPIService(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
-	err = s.kube.DeleteRESTAPIService(ctx, in.Reference)
-	if err != nil {
-		errors = append(errors, err)
-	}
-
-	err = s.kube.DeleteDatabaseRoleSecret(ctx, in.Reference, kube_project.RoleAuthenticator)
+	err = s.kube.DeleteRESTAPIService(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteJWKSConfigMap(ctx, in.Reference)
+	err = s.kube.DeleteDatabaseRoleSecret(ctx, *ref, kube_project.RoleAuthenticator)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	err = s.kube.DeleteJWKSConfigMap(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -441,6 +403,7 @@ func (s *ProjectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 			}
 			if status == nil {
 				c <- dto.ProjectStatusEvent{Message: "Postgres cluster is not ready yet.", Step: 0, TotalStep: totalStep}
+				continue
 			}
 			switch *status {
 			case "Initializing Postgres cluster":

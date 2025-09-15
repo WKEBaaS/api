@@ -49,7 +49,7 @@ type PatchProjectSettingInput struct {
 }
 
 type DeleteProjectByRefInput struct {
-	Reference string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+	ID string `query:"id" format:"uuid" example:"550e8400-e29b-41d4-a716-446655440000" doc:"Project ID (UUID)"`
 }
 type DeleteProjectByRefOutput struct {
 	Body struct {

@@ -83,8 +83,11 @@ func NewAuthMiddleware(api huma.API, config *config.Config) func(huma.Context, f
 			return
 		}
 
+		jwt := resp.Header.Get("Set-Auth-Jwt")
+
 		ctx = huma.WithValue(ctx, "session", sessionResp.Session)
 		ctx = huma.WithValue(ctx, "user", sessionResp.User)
+		ctx = huma.WithValue(ctx, "jwt", jwt)
 		next(ctx)
 	}
 }

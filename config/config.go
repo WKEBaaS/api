@@ -27,6 +27,10 @@ type AuthConfig struct {
 	URL *url.URL
 }
 
+type PgRESTConfig struct {
+	URL *url.URL
+}
+
 type KubeConfig struct {
 	ConfigPath string
 	Project    struct {
@@ -35,11 +39,21 @@ type KubeConfig struct {
 	}
 }
 
+type S3Config struct {
+	Endpoint        string
+	UseSSL          bool
+	AccessKeyID     string
+	SecretAccessKey string
+	Region          string
+}
+
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
+	PgREST   PgRESTConfig
 	Kube     KubeConfig
+	S3       S3Config
 }
 
 func LoadConfig() (*Config, error) {
