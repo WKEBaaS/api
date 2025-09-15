@@ -17,3 +17,12 @@ func GetSessionFromContext(ctx context.Context) (*middlewares.Session, error) {
 	}
 	return &session, nil
 }
+
+func GetJWTFromContext(ctx context.Context) (string, error) {
+	jwt, ok := ctx.Value("jwt").(string)
+	if !ok {
+		slog.ErrorContext(ctx, "JWT not found in context")
+		return "", huma.Error401Unauthorized("JWT not found in context")
+	}
+	return jwt, nil
+}

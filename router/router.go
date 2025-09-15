@@ -29,6 +29,13 @@ func NewAPICli(config *config.Config, controllers ...any) humacli.CLI {
 		}
 
 		humaConfig := huma.DefaultConfig("WKE BaaS API", "0.1.0")
+		humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+			"BearerAuth": {
+				Type:         "http",
+				Scheme:       "bearer",
+				BearerFormat: "JWT",
+			},
+		}
 
 		huma.NewError = NewCustomError
 

@@ -4,8 +4,8 @@ import (
 	"baas-api/config"
 	"baas-api/controllers/middlewares"
 	"baas-api/dto"
-	"baas-api/services"
 	"baas-api/services/kube_project"
+	"baas-api/services/project"
 	"context"
 	"net/http"
 	"time"
@@ -29,7 +29,7 @@ type ProjectControllerInterface interface {
 type ProjectController struct {
 	config         *config.Config                           `di.inject:"config"`
 	kubeProject    kube_project.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
-	projectService services.ProjectServiceInterface         `di.inject:"projectService"`
+	projectService project.ProjectServiceInterface          `di.inject:"projectService"`
 }
 
 func NewProjectController() ProjectControllerInterface {
@@ -38,6 +38,18 @@ func NewProjectController() ProjectControllerInterface {
 
 func (c *ProjectController) RegisterProjectAPIs(api huma.API) {
 	authMiddleware := middlewares.NewAuthMiddleware(api, c.config)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "project-test-any",
+		Method:      "GET",
+		Path:        "/project/test-any",
+		Summary:     "Test Project REST Endpoint",
+		Description: "",
+		Tags:        []string{"Debug"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, func(ctx context.Context, in *struct{}) (*struct{}, error) {
+		return nil, nil
+	})
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-project-by-ref",

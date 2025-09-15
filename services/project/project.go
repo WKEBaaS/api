@@ -1,4 +1,5 @@
-package services
+// Package project implements the project service for managing projects in the BaaS API.
+package project
 
 import (
 	"baas-api/config"
@@ -441,6 +442,7 @@ func (s *ProjectService) GetUserProjectStatusByRef(ctx context.Context, c chan a
 			}
 			if status == nil {
 				c <- dto.ProjectStatusEvent{Message: "Postgres cluster is not ready yet.", Step: 0, TotalStep: totalStep}
+				continue
 			}
 			switch *status {
 			case "Initializing Postgres cluster":
