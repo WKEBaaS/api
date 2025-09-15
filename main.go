@@ -6,6 +6,7 @@ import (
 	"baas-api/repo"
 	"baas-api/router"
 	"baas-api/services/kube_project"
+	"baas-api/services/pgrest"
 	"baas-api/services/project"
 	"context"
 	"log"
@@ -93,6 +94,7 @@ func init() {
 	_, _ = di.RegisterBean("projectAuthSettingRepository", reflect.TypeOf((*repo.ProjectAuthSettingRepository)(nil)))
 
 	//////////// Services //////////
+	_, _ = di.RegisterBean("pgrestService", reflect.TypeOf((*pgrest.PgRestService)(nil)))
 	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeOf((*kube_project.KubeProjectService)(nil)))
 	_, _ = di.RegisterBean("projectService", reflect.TypeOf((*project.ProjectService)(nil)))
 

@@ -213,8 +213,12 @@ func (c *ProjectController) createProject(ctx context.Context, in *dto.CreatePro
 	if err != nil {
 		return nil, err
 	}
+	jwt, err := GetJWTFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	out, internalOut, err := c.projectService.CreateProject(ctx, in, &session.UserID)
+	out, internalOut, err := c.projectService.CreateProject(ctx, in, jwt, &session.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -237,8 +241,12 @@ func (c *ProjectController) deleteProjectByRef(ctx context.Context, in *dto.Dele
 	if err != nil {
 		return nil, err
 	}
+	jwt, err := GetJWTFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	out, err := c.projectService.DeleteProjectByRef(ctx, in, session.UserID)
+	out, err := c.projectService.DeleteProjectByRef(ctx, jwt, in, session.UserID)
 	if err != nil {
 		return nil, err
 	}
