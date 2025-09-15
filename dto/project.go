@@ -48,10 +48,10 @@ type PatchProjectSettingInput struct {
 	}
 }
 
-type DeleteProjectByRefInput struct {
+type DeleteProjectByIDInput struct {
 	ID string `query:"id" format:"uuid" example:"550e8400-e29b-41d4-a716-446655440000" doc:"Project ID (UUID)"`
 }
-type DeleteProjectByRefOutput struct {
+type DeleteProjectByIDOutput struct {
 	Body struct {
 		Success bool `json:"success" doc:"Indicates if the project was successfully deleted"`
 	}

@@ -21,7 +21,7 @@ type ProjectControllerInterface interface {
 	getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender)
 	getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
-	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error)
+	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByIDInput) (*dto.DeleteProjectByIDOutput, error)
 	getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error)
 	resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error)
 }
@@ -236,7 +236,7 @@ func (c *ProjectController) createProject(ctx context.Context, in *dto.CreatePro
 	return out, nil
 }
 
-func (c *ProjectController) deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByRefInput) (*dto.DeleteProjectByRefOutput, error) {
+func (c *ProjectController) deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByIDInput) (*dto.DeleteProjectByIDOutput, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -246,7 +246,7 @@ func (c *ProjectController) deleteProjectByRef(ctx context.Context, in *dto.Dele
 		return nil, err
 	}
 
-	out, err := c.projectService.DeleteProjectByRef(ctx, jwt, in, session.UserID)
+	out, err := c.projectService.DeleteProjectByID(ctx, jwt, in, session.UserID)
 	if err != nil {
 		return nil, err
 	}

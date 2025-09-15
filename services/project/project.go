@@ -8,6 +8,7 @@ import (
 	"baas-api/repo"
 	"baas-api/services/kube_project"
 	"baas-api/services/pgrest"
+	"baas-api/services/s3"
 	"baas-api/utils"
 	"context"
 	"io"
@@ -33,7 +34,7 @@ type ProjectServiceInterface interface {
 	// CreateProjectPostInstall performs post-installation steps after the project's cluster is read.
 	CreateProjectPostInstall(ctx context.Context, ref string, authSecret string, jwks string) error
 	GetProjectJWKS(ctx context.Context, ref string) (*string, error)
-	DeleteProjectByRef(ctx context.Context, jwt string, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error)
+	DeleteProjectByID(ctx context.Context, jwt string, in *dto.DeleteProjectByIDInput, userID string) (*dto.DeleteProjectByIDOutput, error)
 	PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
@@ -43,9 +44,12 @@ type ProjectServiceInterface interface {
 }
 
 type ProjectService struct {
-	config             *config.Config                             `di.inject:"config"`
-	kube               kube_project.KubeProjectServiceInterface   `di.inject:"kubeProjectService"`
-	pgrest             pgrest.PgRestServiceInterface              `di.inject:"pgrestService"`
+	config *config.Config `di.inject:"config"`
+	// Services
+	kube   kube_project.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
+	pgrest pgrest.PgRestServiceInterface            `di.inject:"pgrestService"`
+	s3     s3.S3ServiceInterface                    `di.inject:"s3Service"`
+	// Repositories
 	entity             repo.EntityRepositoryInterface             `di.inject:"entityRepository"`
 	project            repo.ProjectRepositoryInterface            `di.inject:"projectRepository"`
 	projectAuthSetting repo.ProjectAuthSettingRepositoryInterface `di.inject:"projectAuthSettingRepository"`
@@ -73,6 +77,13 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	///// Create database records /////
 	project, err := s.pgrest.CreateProject(ctx, jwt, in.Body.Name, *in.Body.Description)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	////// Create S3 resources /////
+	bucketName := "baas-" + project.Ref
+	err = s.s3.CreateBucket(ctx, bucketName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -203,11 +214,17 @@ func (s *ProjectService) GetProjectJWKS(ctx context.Context, ref string) (*strin
 	return &jwks, nil
 }
 
-func (s *ProjectService) DeleteProjectByRef(ctx context.Context, jwt string, in *dto.DeleteProjectByRefInput, userID string) (*dto.DeleteProjectByRefOutput, error) {
+func (s *ProjectService) DeleteProjectByID(ctx context.Context, jwt string, in *dto.DeleteProjectByIDInput, userID string) (*dto.DeleteProjectByIDOutput, error) {
 	var errors []error
 
 	///// Delete database records /////
 	ref, err := s.pgrest.DeleteProject(ctx, jwt, in.ID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	///// Delete S3 resources /////
+	err = s.s3.DeleteBucket(ctx, *ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -266,7 +283,7 @@ func (s *ProjectService) DeleteProjectByRef(ctx context.Context, jwt string, in 
 		return nil, huma.Error500InternalServerError("Failed to delete project resources", errors...)
 	}
 
-	out := &dto.DeleteProjectByRefOutput{}
+	out := &dto.DeleteProjectByIDOutput{}
 	out.Body.Success = true
 
 	return out, nil

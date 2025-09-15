@@ -12,7 +12,9 @@ import (
 )
 
 type S3ServiceInterface interface {
-	CreateBucket(ctx context.Context, bucketName string) error
+	CreateBucket(ctx context.Context, ref string) error
+	DeleteBucket(ctx context.Context, ref string) error
+	CreateBucketUser(ctx context.Context, ref string, accessKey string, secretKey string) error
 }
 
 type S3Service struct {
@@ -25,7 +27,8 @@ func NewS3Service() S3ServiceInterface {
 	return &S3Service{}
 }
 
-func (s *S3Service) CreateBucket(ctx context.Context, bucketName string) error {
+func (s *S3Service) CreateBucket(ctx context.Context, ref string) error {
+	bucketName := GetBucketNameByRef(ref)
 	err := s.client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{Region: s.config.S3.Region})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create bucket", "error", err)
@@ -34,7 +37,17 @@ func (s *S3Service) CreateBucket(ctx context.Context, bucketName string) error {
 	return nil
 }
 
-func (s *S3Service) CreateBucketUser(ctx context.Context, bucketName string, accessKey string, secretKey string) error {
+func (s *S3Service) DeleteBucket(ctx context.Context, ref string) error {
+	bucketName := GetBucketNameByRef(ref)
+	err := s.client.RemoveBucket(ctx, bucketName)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to delete bucket", "error", err)
+		return errors.New("failed to delete bucket")
+	}
+	return nil
+}
+
+func (s *S3Service) CreateBucketUser(ctx context.Context, ref string, accessKey string, secretKey string) error {
 	err := s.adminClient.AddUser(ctx, accessKey, secretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create user", "error", err)
