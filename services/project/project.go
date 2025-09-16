@@ -82,11 +82,29 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	}
 
 	////// Create S3 resources /////
-	bucketName := "baas-" + project.Ref
-	err = s.s3.CreateBucket(ctx, bucketName)
+	err = s.s3.CreateBucket(ctx, project.S3Bucket)
 	if err != nil {
 		return nil, nil, err
 	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.s3.DeleteBucket(ctx, project.S3Bucket)
+	})
+
+	err = s.s3.CreateBucketUser(ctx, project.S3AccessKeyID, project.S3SecretAccessKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.s3.DeleteBucketUser(ctx, project.S3AccessKeyID)
+	})
+
+	err = s.s3.CreateBucketPolicy(ctx, project.Ref, project.S3Bucket)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanupFuncs = append(cleanupFuncs, func() {
+		_ = s.s3.DeleteBucketPolicy(ctx, project.S3Bucket)
+	})
 
 	///// Create Kubernetes resources /////
 	ref := project.Ref
@@ -218,63 +236,71 @@ func (s *ProjectService) DeleteProjectByID(ctx context.Context, jwt string, in *
 	var errors []error
 
 	///// Delete database records /////
-	ref, err := s.pgrest.DeleteProject(ctx, jwt, in.ID)
+	deleted, err := s.pgrest.DeleteProject(ctx, jwt, in.ID)
 	if err != nil {
-		errors = append(errors, err)
+		return nil, err
 	}
 
 	///// Delete S3 resources /////
-	err = s.s3.DeleteBucket(ctx, *ref)
+	err = s.s3.DeleteBucket(ctx, deleted.S3Bucket)
+	if err != nil {
+		errors = append(errors, err)
+	}
+	err = s.s3.DeleteBucketUser(ctx, deleted.S3AccessKeyID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+	err = s.s3.DeleteBucketPolicy(ctx, deleted.S3Bucket)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
 	///// Delete Kubernetes resources /////
-	err = s.kube.DeleteCluster(ctx, *ref)
+	err = s.kube.DeleteCluster(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteDatabase(ctx, *ref)
+	err = s.kube.DeleteDatabase(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteIngressRouteTCP(ctx, *ref)
+	err = s.kube.DeleteIngressRouteTCP(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteIngressRoute(ctx, *ref)
+	err = s.kube.DeleteIngressRoute(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteAuthAPIDeployment(ctx, *ref)
+	err = s.kube.DeleteAuthAPIDeployment(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteRESTAPIDeployment(ctx, *ref)
+	err = s.kube.DeleteRESTAPIDeployment(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteAuthAPIService(ctx, *ref)
+	err = s.kube.DeleteAuthAPIService(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
-	err = s.kube.DeleteRESTAPIService(ctx, *ref)
-	if err != nil {
-		errors = append(errors, err)
-	}
-
-	err = s.kube.DeleteDatabaseRoleSecret(ctx, *ref, kube_project.RoleAuthenticator)
+	err = s.kube.DeleteRESTAPIService(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteJWKSConfigMap(ctx, *ref)
+	err = s.kube.DeleteDatabaseRoleSecret(ctx, deleted.Ref, kube_project.RoleAuthenticator)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	err = s.kube.DeleteJWKSConfigMap(ctx, deleted.Ref)
 	if err != nil {
 		errors = append(errors, err)
 	}

@@ -4,6 +4,7 @@ package pgrest
 import (
 	"baas-api/config"
 	"context"
+	"encoding/json"
 )
 
 type PgRestServiceInterface interface {
@@ -12,7 +13,7 @@ type PgRestServiceInterface interface {
 	// DeleteProject deletes a project by its ID.
 	//
 	// Returns the `reference` of the deleted project.
-	DeleteProject(ctx context.Context, jwt string, id string) (*string, error)
+	DeleteProject(ctx context.Context, jwt string, id string) (*DeleteProjectOutput, error)
 }
 
 type PgRestService struct {
@@ -21,4 +22,19 @@ type PgRestService struct {
 
 func NewPgRestService() PgRestServiceInterface {
 	return &PgRestService{}
+}
+
+type PgRestError struct {
+	Code    string  `json:"code"`
+	Message string  `json:"message"`
+	Detail  *string `json:"details"`
+	Hint    *string `json:"hint"`
+}
+
+func (s *PgRestService) UnmarshalPgRestError(data []byte) (*PgRestError, error) {
+	var err PgRestError
+	if err := json.Unmarshal(data, &err); err != nil {
+		return nil, err
+	}
+	return &err, nil
 }

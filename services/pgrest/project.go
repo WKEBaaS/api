@@ -10,9 +10,18 @@ import (
 )
 
 type CreateProjectOutput struct {
-	ID         string `json:"id"`
-	Ref        string `json:"ref"`
-	AuthSecret string `json:"auth_secret"`
+	ID                string `json:"id"`
+	Ref               string `json:"ref"`
+	AuthSecret        string `json:"auth_secret"`
+	S3Bucket          string `json:"s3_bucket"`
+	S3AccessKeyID     string `json:"s3_access_key_id"`
+	S3SecretAccessKey string `json:"s3_secret_access_key"`
+}
+
+type DeleteProjectOutput struct {
+	Ref           string `json:"ref"`
+	S3Bucket      string `json:"s3_bucket"`
+	S3AccessKeyID string `json:"s3_access_key_id"`
 }
 
 func (s *PgRestService) CreateProject(ctx context.Context, jwt string, name string, description string) (*CreateProjectOutput, error) {
@@ -30,6 +39,11 @@ func (s *PgRestService) CreateProject(ctx context.Context, jwt string, name stri
 
 	var project []CreateProjectOutput
 	if err := json.Unmarshal([]byte(resp), &project); err != nil {
+		if pgErr, _ := s.UnmarshalPgRestError([]byte(resp)); pgErr != nil {
+			slog.ErrorContext(ctx, "delete_project error", "code", pgErr.Code, "message", pgErr.Message, "detail", pgErr.Detail, "hint", pgErr.Hint)
+			return nil, huma.Error500InternalServerError("delete_project error: " + pgErr.Message)
+		}
+
 		slog.ErrorContext(ctx, "Failed to unmarshal create_project response", "error", err)
 		return nil, huma.Error500InternalServerError("Failed to unmarshal create_project response")
 	}
@@ -42,7 +56,7 @@ func (s *PgRestService) CreateProject(ctx context.Context, jwt string, name stri
 	return &project[0], nil
 }
 
-func (s *PgRestService) DeleteProject(ctx context.Context, jwt string, id string) (*string, error) {
+func (s *PgRestService) DeleteProject(ctx context.Context, jwt string, id string) (*DeleteProjectOutput, error) {
 	pgrst := postgrest.NewClient(s.config.PgREST.URL.String(), "api", nil)
 	pgrst.SetAuthToken(jwt)
 	resp := pgrst.Rpc("delete_project", "", map[string]any{
@@ -54,18 +68,21 @@ func (s *PgRestService) DeleteProject(ctx context.Context, jwt string, id string
 		return nil, huma.Error500InternalServerError("Failed to call delete_project RPC")
 	}
 
-	var ref string
-	if err := json.Unmarshal([]byte(resp), &ref); err != nil {
+	var out []DeleteProjectOutput
+	if err := json.Unmarshal([]byte(resp), &out); err != nil {
+		if pgErr, _ := s.UnmarshalPgRestError([]byte(resp)); pgErr != nil {
+			slog.ErrorContext(ctx, "delete_project error", "code", pgErr.Code, "message", pgErr.Message, "detail", pgErr.Detail, "hint", pgErr.Hint)
+			return nil, huma.Error500InternalServerError("delete_project error: " + pgErr.Message)
+		}
+
 		slog.ErrorContext(ctx, "Failed to unmarshal delete_project response", "error", err)
 		return nil, huma.Error500InternalServerError("Failed to unmarshal delete_project response")
 	}
 
-	if ref == "" {
-		slog.ErrorContext(ctx, "delete_project returned no reference")
-		return nil, huma.Error500InternalServerError("delete_project returned no reference")
+	if len(out) == 0 {
+		slog.ErrorContext(ctx, "delete_project returned no project")
+		return nil, huma.Error500InternalServerError("delete_project returned no project")
 	}
 
-	slog.InfoContext(ctx, "Project deleted", "project_id", id, "reference", ref, "response", resp)
-
-	return &ref, nil
+	return &out[0], nil
 }
