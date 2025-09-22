@@ -19,9 +19,9 @@ var (
 )
 
 type ProjectAuthSettingRepositoryInterface interface {
-	Create(ctx context.Context, s *models.ProjectSettings) error
-	FindByProjectID(ctx context.Context, projectID string) (*models.ProjectSettings, error)
-	Update(ctx context.Context, s *models.ProjectSettings) error
+	Create(ctx context.Context, s *models.ProjectAuthSettings) error
+	FindByProjectID(ctx context.Context, projectID string) (*models.ProjectAuthSettings, error)
+	Update(ctx context.Context, s *models.ProjectAuthSettings) error
 	DeleteByProjectID(ctx context.Context, projectID string) error
 	CreateOAuthProvider(ctx context.Context, provider *models.ProjectAuthProvider) (*string, error)
 	UpsertOAuthProviders(ctx context.Context, providers []*models.ProjectAuthProvider) error
@@ -39,7 +39,7 @@ func NewProjectAuthSettingRepository(db *gorm.DB) ProjectAuthSettingRepositoryIn
 	}
 }
 
-func (r *ProjectAuthSettingRepository) Create(ctx context.Context, s *models.ProjectSettings) error {
+func (r *ProjectAuthSettingRepository) Create(ctx context.Context, s *models.ProjectAuthSettings) error {
 	if err := r.db.WithContext(ctx).Create(s).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to create project auth setting", "error", err)
 		return ErrProjectAuthSettingCreateFailed
@@ -47,8 +47,8 @@ func (r *ProjectAuthSettingRepository) Create(ctx context.Context, s *models.Pro
 	return nil
 }
 
-func (r *ProjectAuthSettingRepository) FindByProjectID(ctx context.Context, projectID string) (*models.ProjectSettings, error) {
-	var setting models.ProjectSettings
+func (r *ProjectAuthSettingRepository) FindByProjectID(ctx context.Context, projectID string) (*models.ProjectAuthSettings, error) {
+	var setting models.ProjectAuthSettings
 	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).First(&setting).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.WarnContext(ctx, "Project auth setting not found", "projectID", projectID)
@@ -60,8 +60,8 @@ func (r *ProjectAuthSettingRepository) FindByProjectID(ctx context.Context, proj
 	return &setting, nil
 }
 
-func (r *ProjectAuthSettingRepository) Update(ctx context.Context, s *models.ProjectSettings) error {
-	if err := r.db.WithContext(ctx).Model(&models.ProjectSettings{}).Where("project_id = ?", s.ProjectID).Updates(s).Error; err != nil {
+func (r *ProjectAuthSettingRepository) Update(ctx context.Context, s *models.ProjectAuthSettings) error {
+	if err := r.db.WithContext(ctx).Model(&models.ProjectAuthSettings{}).Where("project_id = ?", s.ProjectID).Updates(s).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to update project auth setting", "error", err)
 		return ErrDatabaseError
 	}
@@ -69,7 +69,7 @@ func (r *ProjectAuthSettingRepository) Update(ctx context.Context, s *models.Pro
 }
 
 func (r *ProjectAuthSettingRepository) DeleteByProjectID(ctx context.Context, projectID string) error {
-	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).Delete(&models.ProjectSettings{}).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("project_id = ?", projectID).Delete(&models.ProjectAuthSettings{}).Error; err != nil {
 		slog.ErrorContext(ctx, "Failed to delete project auth setting", "error", err)
 		return ErrDatabaseError
 	}

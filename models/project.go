@@ -29,7 +29,7 @@ func (Project) TableName() string {
 	return "dbo.projects"
 }
 
-type ProjectSettings struct {
+type ProjectAuthSettings struct {
 	ID             string         `gorm:"type:uuid;primaryKey;default:uuidv7()" json:"id"`
 	ProjectID      string         `gorm:"type:uuid;not null;unique" json:"project_id"`
 	Secret         string         `gorm:"type:text;not null;default:encode(gen_random_bytes(32), 'base64')" json:"secret"`
@@ -39,8 +39,8 @@ type ProjectSettings struct {
 }
 
 // TableName specifies the table name for ProjectAuthSettings
-func (ProjectSettings) TableName() string {
-	return "dbo.project_settings"
+func (ProjectAuthSettings) TableName() string {
+	return "dbo.project_auth_settings"
 }
 
 // ProjectAuthProvider represents the project_oauth_providers table
