@@ -2,9 +2,10 @@
 package pgrest
 
 import (
-	"baas-api/config"
 	"context"
 	"encoding/json"
+
+	"baas-api/config"
 )
 
 type PgRestServiceInterface interface {
@@ -14,6 +15,10 @@ type PgRestServiceInterface interface {
 	//
 	// Returns the `reference` of the deleted project.
 	DeleteProject(ctx context.Context, jwt string, id string) (*DeleteProjectOutput, error)
+	// UpdateProject
+	UpdateProject(ctx context.Context, jwt string, payload UpdateProjectPayload) (*UpdateProjectOutput, error)
+	// CreateOrUpdateAuthProvider
+	CreateOrUpdateAuthProvider(ctx context.Context, jwt string, payload CreateOrUpdateAuthProviderPayload) error
 }
 
 type PgRestService struct {

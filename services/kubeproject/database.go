@@ -1,7 +1,7 @@
-// Package kube
+// Package kubeproject
 //
 // kubernetes related repository for project management
-package kube_project
+package kubeproject
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (r *KubeProjectService) CreateDatabase(ctx context.Context, ref string) error {
+func (s *KubeProjectService) CreateDatabase(ctx context.Context, ref string) error {
 	pgDatabaseYAML, err := os.Open("kube-files/project-cnpg-database.yaml")
 	if err != nil {
 		slog.Error("Failed to open Postgres database YAML file", "error", err)
@@ -30,7 +30,7 @@ func (r *KubeProjectService) CreateDatabase(ctx context.Context, ref string) err
 
 	// set metadata
 	pgDatabaseUnstructured.SetName(ref)
-	pgDatabaseUnstructured.SetNamespace(r.namespace)
+	pgDatabaseUnstructured.SetNamespace(s.namespace)
 
 	// set spec.cluster.name
 	if err := unstructured.SetNestedField(pgDatabaseUnstructured.Object, ref, "spec", "cluster", "name"); err != nil {
@@ -39,8 +39,8 @@ func (r *KubeProjectService) CreateDatabase(ctx context.Context, ref string) err
 	}
 
 	// 使用 dynamicClient 創建資源
-	_, err = r.dynamicClient.Resource(databaseGVR).
-		Namespace(r.namespace).
+	_, err = s.dynamicClient.Resource(databaseGVR).
+		Namespace(s.namespace).
 		Create(ctx, pgDatabaseUnstructured, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create Postgres database", "error", err)
@@ -50,10 +50,10 @@ func (r *KubeProjectService) CreateDatabase(ctx context.Context, ref string) err
 	return nil
 }
 
-func (r *KubeProjectService) DeleteDatabase(ctx context.Context, ref string) error {
+func (s *KubeProjectService) DeleteDatabase(ctx context.Context, ref string) error {
 	// 使用 dynamicClient 刪除資源
-	err := r.dynamicClient.Resource(databaseGVR).
-		Namespace(r.namespace).
+	err := s.dynamicClient.Resource(databaseGVR).
+		Namespace(s.namespace).
 		Delete(ctx, ref, metav1.DeleteOptions{})
 	if err != nil {
 		slog.Error("Failed to delete Postgres database", "error", err)

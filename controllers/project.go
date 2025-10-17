@@ -1,14 +1,15 @@
 package controllers
 
 import (
-	"baas-api/config"
-	"baas-api/controllers/middlewares"
-	"baas-api/dto"
-	"baas-api/services/kube_project"
-	"baas-api/services/project"
 	"context"
 	"net/http"
 	"time"
+
+	"baas-api/config"
+	"baas-api/controllers/middlewares"
+	"baas-api/dto"
+	"baas-api/services/kubeproject"
+	"baas-api/services/project"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/sse"
@@ -17,7 +18,7 @@ import (
 type ProjectControllerInterface interface {
 	RegisterProjectAPIs(api huma.API)
 	getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error)
-	patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error)
+	patchProjectSettings(ctx context.Context, in *dto.UpdateProjectInput) (*struct{}, error)
 	getProjectStatus(ctx context.Context, in *dto.GetProjectByRefInput, send sse.Sender)
 	getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
@@ -27,9 +28,9 @@ type ProjectControllerInterface interface {
 }
 
 type ProjectController struct {
-	config         *config.Config                           `di.inject:"config"`
-	kubeProject    kube_project.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
-	projectService project.ProjectServiceInterface          `di.inject:"projectService"`
+	config         *config.Config                          `di.inject:"config"`
+	kubeProject    kubeproject.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
+	projectService project.ProjectServiceInterface         `di.inject:"projectService"`
 }
 
 func NewProjectController() ProjectControllerInterface {
@@ -148,12 +149,17 @@ func (c *ProjectController) getProjectByRef(ctx context.Context, in *dto.GetProj
 	return &dto.GetProjectByRefOutput{Body: *out}, nil
 }
 
-func (c *ProjectController) patchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput) (*struct{}, error) {
+func (c *ProjectController) patchProjectSettings(ctx context.Context, in *dto.UpdateProjectInput) (*struct{}, error) {
 	session, err := GetSessionFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = c.projectService.PatchProjectSettings(ctx, in, session.UserID)
+	jwt, err := GetJWTFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.projectService.PatchProjectSettings(ctx, jwt, in, session.UserID)
 	if err != nil {
 		return nil, err
 	}

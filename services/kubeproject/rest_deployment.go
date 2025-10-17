@@ -1,4 +1,4 @@
-package kube_project
+package kubeproject
 
 import (
 	"context"
@@ -11,18 +11,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *KubeProjectService) CreateRESTAPIDeployment(ctx context.Context, ref string, jwks string) error {
-	deploymentName := r.GetRESTAPIDeploymentName(ref)
-	pgrstContainerName := r.GetRESTAPIContainerName(ref, PGRSTComponent)
-	openapiContainerName := r.GetRESTAPIContainerName(ref, OpenAPIComponent)
-	authenticatorSecretName := r.GetDatabaseRoleSecretName(ref, RoleAuthenticator)
-	restURL := r.GetRESTAPIURL(ref)
-	scalarConfig := r.GenerateScalarAPIConfig(restURL)
+func (s *KubeProjectService) CreateRESTAPIDeployment(ctx context.Context, ref string, jwks string) error {
+	deploymentName := s.GetRESTAPIDeploymentName(ref)
+	pgrstContainerName := s.GetRESTAPIContainerName(ref, PGRSTComponent)
+	openapiContainerName := s.GetRESTAPIContainerName(ref, OpenAPIComponent)
+	authenticatorSecretName := s.GetDatabaseRoleSecretName(ref, RoleAuthenticator)
+	restURL := s.GetRESTAPIURL(ref)
+	scalarConfig := s.GenerateScalarAPIConfig(restURL)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
-			Namespace: r.namespace,
+			Namespace: s.namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: lo.ToPtr(int32(1)),
@@ -81,7 +81,7 @@ func (r *KubeProjectService) CreateRESTAPIDeployment(ctx context.Context, ref st
 		},
 	}
 
-	_, err := r.clientset.AppsV1().Deployments(r.namespace).Create(ctx, deployment, metav1.CreateOptions{})
+	_, err := s.clientset.AppsV1().Deployments(s.namespace).Create(ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create REST API deployment", "error", err)
 		return errors.New("failed to create REST API deployment")
@@ -90,11 +90,11 @@ func (r *KubeProjectService) CreateRESTAPIDeployment(ctx context.Context, ref st
 	return nil
 }
 
-func (r *KubeProjectService) DeleteRESTAPIDeployment(ctx context.Context, ref string) error {
-	deploymentName := r.GetRESTAPIDeploymentName(ref)
+func (s *KubeProjectService) DeleteRESTAPIDeployment(ctx context.Context, ref string) error {
+	deploymentName := s.GetRESTAPIDeploymentName(ref)
 
 	// Delete the deployment
-	err := r.clientset.AppsV1().Deployments(r.namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
+	err := s.clientset.AppsV1().Deployments(s.namespace).Delete(ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to delete API deployment", "error", err)
 		return errors.New("failed to delete API deployment")

@@ -1,18 +1,19 @@
 package main
 
 import (
-	"baas-api/config"
-	"baas-api/controllers"
-	"baas-api/repo"
-	"baas-api/router"
-	"baas-api/services/kube_project"
-	"baas-api/services/pgrest"
-	"baas-api/services/project"
-	"baas-api/services/s3"
 	"context"
 	"log"
 	"reflect"
 	"time"
+
+	"baas-api/config"
+	"baas-api/controllers"
+	"baas-api/repo"
+	"baas-api/router"
+	"baas-api/services/kubeproject"
+	"baas-api/services/pgrest"
+	"baas-api/services/project"
+	"baas-api/services/s3"
 
 	"github.com/goioc/di"
 	"github.com/minio/madmin-go/v4"
@@ -97,7 +98,7 @@ func init() {
 	//////////// Services //////////
 	_, _ = di.RegisterBean("pgrestService", reflect.TypeOf((*pgrest.PgRestService)(nil)))
 	_, _ = di.RegisterBean("s3Service", reflect.TypeOf((*s3.S3Service)(nil)))
-	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeOf((*kube_project.KubeProjectService)(nil)))
+	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeOf((*kubeproject.KubeProjectService)(nil)))
 	_, _ = di.RegisterBean("projectService", reflect.TypeOf((*project.ProjectService)(nil)))
 
 	//////////// Controllers //////////

@@ -1,4 +1,4 @@
-package kube_project
+package kubeproject
 
 import (
 	"context"
@@ -10,13 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref string) error {
-	serviceName := r.GetAuthAPIServiceName(ref)
-	deploymentName := r.GetAuthAPIDeploymentName(ref)
+func (s *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref string) error {
+	serviceName := s.GetAuthAPIServiceName(ref)
+	deploymentName := s.GetAuthAPIDeploymentName(ref)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: r.namespace,
+			Namespace: s.namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeClusterIP,
@@ -34,7 +34,7 @@ func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref strin
 		},
 	}
 
-	_, err := r.clientset.CoreV1().Services(r.namespace).Create(ctx, service, metav1.CreateOptions{})
+	_, err := s.clientset.CoreV1().Services(s.namespace).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create Auth API service", "error", err)
 		return errors.New("failed to create Auth API service")
@@ -43,10 +43,10 @@ func (r *KubeProjectService) CreateAuthAPIService(ctx context.Context, ref strin
 	return nil
 }
 
-func (r *KubeProjectService) DeleteAuthAPIService(ctx context.Context, ref string) error {
-	serviceName := r.GetAuthAPIServiceName(ref)
+func (s *KubeProjectService) DeleteAuthAPIService(ctx context.Context, ref string) error {
+	serviceName := s.GetAuthAPIServiceName(ref)
 
-	err := r.clientset.CoreV1().Services(r.namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
+	err := s.clientset.CoreV1().Services(s.namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to delete Auth API service", "error", err)
 		return errors.New("failed to delete Auth API service")

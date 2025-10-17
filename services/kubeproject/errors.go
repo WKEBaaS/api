@@ -1,7 +1,7 @@
 // Package kube
 //
 // kubernetes related repository for project management
-package kube_project
+package kubeproject
 
 import "errors"
 

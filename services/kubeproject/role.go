@@ -1,4 +1,4 @@
-package kube_project
+package kubeproject
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *KubeProjectService) buildDatabaseRoleSecret(ref string, role string, password string) *corev1.Secret {
-	secretName := r.GetDatabaseRoleSecretName(ref, role)
+func (s *KubeProjectService) buildDatabaseRoleSecret(ref string, role string, password string) *corev1.Secret {
+	secretName := s.GetDatabaseRoleSecretName(ref, role)
 
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -19,7 +19,7 @@ func (r *KubeProjectService) buildDatabaseRoleSecret(ref string, role string, pa
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: r.namespace,
+			Namespace: s.namespace,
 			Labels: map[string]string{
 				"cnpg.io/reload": "true",
 			},
@@ -33,14 +33,14 @@ func (r *KubeProjectService) buildDatabaseRoleSecret(ref string, role string, pa
 	}
 }
 
-func (r *KubeProjectService) CreateDatabaseRoleSecret(ctx context.Context, ref string, role string, password string) error {
-	secret := r.buildDatabaseRoleSecret(ref, role, password)
+func (s *KubeProjectService) CreateDatabaseRoleSecret(ctx context.Context, ref string, role string, password string) error {
+	secret := s.buildDatabaseRoleSecret(ref, role, password)
 
-	_, err := r.clientset.CoreV1().Secrets(r.namespace).Create(ctx, secret, metav1.CreateOptions{})
+	_, err := s.clientset.CoreV1().Secrets(s.namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create database role secret",
 			"secret_name", secret.Name,
-			"namespace", r.namespace,
+			"namespace", s.namespace,
 			"error", err,
 		)
 		return fmt.Errorf("failed to create database role secret")
@@ -49,14 +49,14 @@ func (r *KubeProjectService) CreateDatabaseRoleSecret(ctx context.Context, ref s
 	return nil
 }
 
-func (r *KubeProjectService) UpdateDatabaseRoleSecret(ctx context.Context, ref string, role string, password string) error {
-	secret := r.buildDatabaseRoleSecret(ref, role, password)
+func (s *KubeProjectService) UpdateDatabaseRoleSecret(ctx context.Context, ref string, role string, password string) error {
+	secret := s.buildDatabaseRoleSecret(ref, role, password)
 
-	_, err := r.clientset.CoreV1().Secrets(r.namespace).Update(ctx, secret, metav1.UpdateOptions{})
+	_, err := s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, secret, metav1.UpdateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to update database role secret",
 			"secret_name", secret.Name,
-			"namespace", r.namespace,
+			"namespace", s.namespace,
 			"error", err,
 		)
 		return fmt.Errorf("failed to update database role secret")
@@ -65,9 +65,9 @@ func (r *KubeProjectService) UpdateDatabaseRoleSecret(ctx context.Context, ref s
 	return nil
 }
 
-func (r *KubeProjectService) FindDatabaseRolePassword(ctx context.Context, ref string, role string) (*string, error) {
-	secretName := r.GetDatabaseRoleSecretName(ref, role)
-	secret, err := r.clientset.CoreV1().Secrets(r.namespace).Get(ctx, secretName, metav1.GetOptions{})
+func (s *KubeProjectService) FindDatabaseRolePassword(ctx context.Context, ref string, role string) (*string, error) {
+	secretName := s.GetDatabaseRoleSecretName(ref, role)
+	secret, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		slog.Error("Failed to read database secret", "error", err)
 		return nil, ErrFailedToReadDatabaseSecret

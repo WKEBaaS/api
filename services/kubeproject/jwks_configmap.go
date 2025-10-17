@@ -1,4 +1,4 @@
-package kube_project
+package kubeproject
 
 import (
 	"context"

@@ -1,7 +1,7 @@
 // Package kube_project
 //
 // kubernetes related repository for project management
-package kube_project
+package kubeproject
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, storageSize string) error {
+func (s *KubeProjectService) CreateCluster(ctx context.Context, ref string, storageSize string) error {
 	clusterYAML, err := os.ReadFile("kube-files/project-cnpg-cluster.yaml")
 	if err != nil {
 		slog.Error("Failed to open Postgres cluster YAML file", "error", err)
@@ -27,7 +27,7 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, stor
 
 	clusterYAMLString := string(clusterYAML)
 	clusterData := map[string]any{
-		"RoleAuthenticatorSecretName": r.GetDatabaseRoleSecretName(ref, RoleAuthenticator),
+		"RoleAuthenticatorSecretName": s.GetDatabaseRoleSecretName(ref, RoleAuthenticator),
 	}
 	clusterTmpl, err := template.New("yaml").Parse(clusterYAMLString)
 	if err != nil {
@@ -49,7 +49,7 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, stor
 
 	// set metadata
 	cluster.SetName(ref)
-	cluster.SetNamespace(r.namespace)
+	cluster.SetNamespace(s.namespace)
 
 	// set spec.storage.size
 	if err := unstructured.SetNestedField(cluster.Object, storageSize, "spec", "storage", "size"); err != nil {
@@ -58,8 +58,8 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, stor
 	}
 
 	// 使用 dynamicClient 創建資源
-	_, err = r.dynamicClient.Resource(clusterGVR).
-		Namespace(r.namespace).
+	_, err = s.dynamicClient.Resource(clusterGVR).
+		Namespace(s.namespace).
 		Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
 		slog.Error("Failed to create Postgres cluster", "error", err)
@@ -69,10 +69,10 @@ func (r *KubeProjectService) CreateCluster(ctx context.Context, ref string, stor
 	return nil
 }
 
-func (r *KubeProjectService) DeleteCluster(ctx context.Context, ref string) error {
+func (s *KubeProjectService) DeleteCluster(ctx context.Context, ref string) error {
 	// 使用 dynamicClient 刪除資源
-	err := r.dynamicClient.Resource(clusterGVR).
-		Namespace(r.namespace).
+	err := s.dynamicClient.Resource(clusterGVR).
+		Namespace(s.namespace).
 		Delete(ctx, ref, metav1.DeleteOptions{})
 	if err != nil {
 		slog.Error("Failed to delete Postgres cluster", "error", err)
@@ -82,9 +82,9 @@ func (r *KubeProjectService) DeleteCluster(ctx context.Context, ref string) erro
 	return nil
 }
 
-func (r *KubeProjectService) FindClusterStatus(ctx context.Context, ref string) (*string, error) {
-	deployment, err := r.dynamicClient.Resource(clusterGVR).
-		Namespace(r.namespace).
+func (s *KubeProjectService) FindClusterStatus(ctx context.Context, ref string) (*string, error) {
+	deployment, err := s.dynamicClient.Resource(clusterGVR).
+		Namespace(s.namespace).
 		Get(ctx, ref, metav1.GetOptions{})
 	if err != nil {
 		slog.Error("Failed to get postgres cluster", "error", err)

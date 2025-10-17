@@ -1,4 +1,4 @@
-package kube_project
+package kubeproject
 
 import (
 	"fmt"
@@ -21,33 +21,33 @@ const (
 )
 
 // ===== Auth API =====
-func (r *KubeProjectService) GetProjectHost(ref string) string {
-	return ref + "." + r.config.App.ExternalDomain
+func (s *KubeProjectService) GetProjectHost(ref string) string {
+	return ref + "." + s.config.App.ExternalDomain
 }
 
-func (r *KubeProjectService) GetAuthAPIURL(ref string) string {
+func (s *KubeProjectService) GetAuthAPIURL(ref string) string {
 	u := url.URL{
 		Scheme: "https",
-		Host:   r.GetProjectHost(ref),
+		Host:   s.GetProjectHost(ref),
 		Path:   "/api/auth",
 	}
 	return u.String()
 }
 
-func (r *KubeProjectService) GetRESTAPIURL(ref string) string {
+func (s *KubeProjectService) GetRESTAPIURL(ref string) string {
 	u := url.URL{
 		Scheme: "https",
-		Host:   r.GetProjectHost(ref),
+		Host:   s.GetProjectHost(ref),
 		Path:   "/api/rest",
 	}
 	return u.String()
 }
 
-func (r *KubeProjectService) GetJWKSConfigMapName(ref string) string {
+func (s *KubeProjectService) GetJWKSConfigMapName(ref string) string {
 	return generateResourceName(ref, "jwks")
 }
 
-func (r *KubeProjectService) GetMigrationJobName(ref string) string {
+func (s *KubeProjectService) GetMigrationJobName(ref string) string {
 	return generateResourceName(ref, "migration")
 }
 

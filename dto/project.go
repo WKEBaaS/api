@@ -5,9 +5,9 @@ import (
 )
 
 type AuthProvider struct {
-	Enabled      bool   `json:"enabled" doc:"Enable this OAuth provider"`
-	ClientID     string `json:"clientId,omitempty" doc:"OAuth Client ID"`
-	ClientSecret string `json:"clientSecret,omitempty" doc:"OAuth Clien Secret"`
+	Enabled      bool    `json:"enabled" doc:"Enable this OAuth provider"`
+	ClientID     *string `json:"clientId,omitempty" doc:"OAuth Client ID"`
+	ClientSecret *string `json:"clientSecret,omitempty" doc:"OAuth Clien Secret"`
 }
 
 type GetProjectByRefInput struct {
@@ -33,18 +33,16 @@ type CreateProjectOutput struct {
 	}
 }
 
-type PatchProjectSettingInput struct {
+// UpdateProjectInput 是更新專案設定的 payload
+type UpdateProjectInput struct {
 	Body struct {
-		Ref            string   `json:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
-		Name           *string  `json:"name,omitempty" maxLength:"100" example:"My Project" doc:"Project name"`
-		Description    *string  `json:"description,omitempty" maxLength:"4000" required:"false" example:"This is my project" doc:"Project description"`
-		TrustedOrigins []string `json:"trustedOrigins,omitempty" example:"https://example.com" doc:"List of trusted origins for CORS"`
-		Auth           *struct {
-			Email   *AuthProvider `json:"email,omitempty" doc:"Enable email and password authentication"`
-			Google  *AuthProvider `json:"google,omitempty" doc:"Google OAuth provider settings"`
-			GitHub  *AuthProvider `json:"github,omitempty" doc:"GitHub OAuth provider settings"`
-			Discord *AuthProvider `json:"discord,omitempty" doc:"Discord OAuth provider settings"`
-		} `json:"auth,omitempty" doc:"Authentication settings for the project"`
+		ID             string   `json:"id" format:"uuid"`
+		Name           *string  `json:"name,omitempty" maxLength:"100"`
+		Description    *string  `json:"description,omitempty" maxLength:"4000"`
+		TrustedOrigins []string `json:"trustedOrigins,omitempty"`
+		ProxyURL       *string  `json:"proxyUrl,omitempty"`
+		// 使用 map 來動態接收任意數量的 auth provider
+		Auth map[string]AuthProvider `json:"auth,omitempty"`
 	}
 }
 
@@ -90,15 +88,16 @@ type ProjectAuthSettings struct {
 }
 
 type ProjectAuthProviderInfo struct {
-	Enabled      bool   `json:"enabled" doc:"Whether this OAuth provider is enabled"`
-	ClientID     string `json:"clientId,omitempty" doc:"OAuth Client ID"`
-	ClientSecret string `json:"clientSecret,omitempty" doc:"OAuth Client Secret"`
+	Enabled      bool    `json:"enabled" doc:"Whether this OAuth provider is enabled"`
+	ClientID     *string `json:"clientId,omitempty" doc:"OAuth Client ID"`
+	ClientSecret *string `json:"clientSecret,omitempty" doc:"OAuth Client Secret"`
 }
 
 type GetProjectSettingsOutput struct {
 	Body struct {
 		ID             string              `json:"id" doc:"Project ID"`
 		TrustedOrigins []string            `json:"trustedOrigins" doc:"List of trusted origins for CORS"`
+		ProxyURL       *string             `json:"proxyURL,omitempty" doc:"Proxy URL if set"`
 		Auth           ProjectAuthSettings `json:"auth" doc:"Authentication settings for the project"`
 		CreatedAt      string              `json:"createdAt" doc:"Project creation timestamp"`
 		UpdatedAt      string              `json:"updatedAt" doc:"Project last update timestamp"`

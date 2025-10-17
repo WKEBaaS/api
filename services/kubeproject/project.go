@@ -1,12 +1,13 @@
 // Package kube
 //
 // kubernetes related repository for project management
-package kube_project
+package kubeproject
 
 import (
-	"baas-api/config"
 	"context"
 	"log"
+
+	"baas-api/config"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"

@@ -2,20 +2,21 @@
 package project
 
 import (
-	"baas-api/config"
-	"baas-api/dto"
-	"baas-api/models"
-	"baas-api/repo"
-	"baas-api/services/kube_project"
-	"baas-api/services/pgrest"
-	"baas-api/services/s3"
-	"baas-api/utils"
 	"context"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
+
+	"baas-api/config"
+	"baas-api/dto"
+	"baas-api/models"
+	"baas-api/repo"
+	"baas-api/services/kubeproject"
+	"baas-api/services/pgrest"
+	"baas-api/services/s3"
+	"baas-api/utils"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/samber/lo"
@@ -35,7 +36,7 @@ type ProjectServiceInterface interface {
 	CreateProjectPostInstall(ctx context.Context, ref string, authSecret string, jwks string) error
 	GetProjectJWKS(ctx context.Context, ref string) (*string, error)
 	DeleteProjectByID(ctx context.Context, jwt string, in *dto.DeleteProjectByIDInput, userID string) (*dto.DeleteProjectByIDOutput, error)
-	PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error
+	PatchProjectSettings(ctx context.Context, jwt string, in *dto.UpdateProjectInput, userID string) error
 	GetUsersProjects(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	GetUserProjectByRef(ctx context.Context, ref, userID string) (*models.ProjectView, error)
 	GetUserProjectStatusByRef(ctx context.Context, c chan any, ref, userID string) error
@@ -46,9 +47,9 @@ type ProjectServiceInterface interface {
 type ProjectService struct {
 	config *config.Config `di.inject:"config"`
 	// Services
-	kube   kube_project.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
-	pgrest pgrest.PgRestServiceInterface            `di.inject:"pgrestService"`
-	s3     s3.S3ServiceInterface                    `di.inject:"s3Service"`
+	kube   kubeproject.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
+	pgrest pgrest.PgRestServiceInterface           `di.inject:"pgrestService"`
+	s3     s3.S3ServiceInterface                   `di.inject:"s3Service"`
 	// Repositories
 	entity             repo.EntityRepositoryInterface             `di.inject:"entityRepository"`
 	project            repo.ProjectRepositoryInterface            `di.inject:"projectRepository"`
@@ -121,12 +122,12 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 	})
 
 	password := utils.GenerateNewPassword(16)
-	err = s.kube.CreateDatabaseRoleSecret(ctx, ref, kube_project.RoleAuthenticator, password)
+	err = s.kube.CreateDatabaseRoleSecret(ctx, ref, kubeproject.RoleAuthenticator, password)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanupFuncs = append(cleanupFuncs, func() {
-		_ = s.kube.DeleteDatabaseRoleSecret(ctx, ref, kube_project.RoleAuthenticator)
+		_ = s.kube.DeleteDatabaseRoleSecret(ctx, ref, kubeproject.RoleAuthenticator)
 	})
 
 	err = s.kube.CreateCluster(ctx, ref, in.Body.StorageSize)
@@ -165,9 +166,15 @@ func (s *ProjectService) CreateProjectPostInstall(ctx context.Context, ref strin
 	}
 
 	err = s.kube.CreateAuthAPIDeployment(ctx, ref,
-		kube_project.NewAPIDeploymentOption().
-			WithBetterAuthSecret(authSecret).
-			WithEmailAndPasswordAuth(true),
+		&kubeproject.APIDeploymentOption{
+			BetterAuthSecret: &authSecret,
+			TrustedOrigins:   []string{"*"},
+			AuthProviders: map[string]dto.AuthProvider{
+				"email": {
+					Enabled: true,
+				},
+			},
+		},
 	)
 	if err != nil {
 		return err
@@ -295,7 +302,7 @@ func (s *ProjectService) DeleteProjectByID(ctx context.Context, jwt string, in *
 		errors = append(errors, err)
 	}
 
-	err = s.kube.DeleteDatabaseRoleSecret(ctx, deleted.Ref, kube_project.RoleAuthenticator)
+	err = s.kube.DeleteDatabaseRoleSecret(ctx, deleted.Ref, kubeproject.RoleAuthenticator)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -315,95 +322,51 @@ func (s *ProjectService) DeleteProjectByID(ctx context.Context, jwt string, in *
 	return out, nil
 }
 
-func (s *ProjectService) PatchProjectSettings(ctx context.Context, in *dto.PatchProjectSettingInput, userID string) error {
-	project, err := s.project.FindByRef(ctx, in.Body.Ref)
+func (s *ProjectService) PatchProjectSettings(ctx context.Context, jwt string, in *dto.UpdateProjectInput, userID string) error {
+	updated, err := s.pgrest.UpdateProject(ctx, jwt, pgrest.UpdateProjectPayload{
+		ID:             in.Body.ID,
+		Name:           in.Body.Name,
+		Description:    in.Body.Description,
+		TrustedOrigins: in.Body.TrustedOrigins,
+		ProxyURL:       in.Body.ProxyURL,
+	})
 	if err != nil {
 		return err
 	}
-	if project.OwnerID != userID {
-		return huma.Error401Unauthorized("Unauthorized")
-	}
 
-	objectPayload := &models.Object{}
-	projectPayload := &models.Project{}
-	authProviders := []*models.ProjectAuthProvider{}
 	needPatchDeployment := false
-
-	if in.Body.Name != nil || in.Body.Description != nil {
-		objectPayload.ChineseName = in.Body.Name
-		objectPayload.ChineseDescription = in.Body.Description
-		objectPayload.UpdatedAt = time.Now()
-	}
-
-	opt := kube_project.NewAPIDeploymentOption()
+	opt := &kubeproject.APIDeploymentOption{}
 	if in.Body.TrustedOrigins != nil {
 		needPatchDeployment = true
-		opt.WithTrustedOrigins(in.Body.TrustedOrigins)
+		opt.TrustedOrigins = in.Body.TrustedOrigins
+	}
+
+	if in.Body.ProxyURL != nil {
+		needPatchDeployment = true
+		opt.ProxyURL = in.Body.ProxyURL
 	}
 
 	if in.Body.Auth != nil {
 		needPatchDeployment = true
-		if in.Body.Auth.Email != nil {
-			opt.WithEmailAndPasswordAuth(in.Body.Auth.Email.Enabled)
-			authProviders = append(authProviders, &models.ProjectAuthProvider{
-				Name:      "email",
-				ProjectID: project.ID,
-				Enabled:   in.Body.Auth.Email.Enabled,
-				UpdatedAt: time.Now(),
-			})
-		}
-		if in.Body.Auth.Google != nil {
-			opt.WithGoogle(in.Body.Auth.Google.ClientID, in.Body.Auth.Google.ClientSecret)
-			authProviders = append(authProviders, &models.ProjectAuthProvider{
-				Name:         "google",
-				ProjectID:    project.ID,
-				Enabled:      in.Body.Auth.Google.Enabled,
-				ClientID:     in.Body.Auth.Google.ClientID,
-				ClientSecret: in.Body.Auth.Google.ClientSecret,
-				UpdatedAt:    time.Now(),
-			})
-		}
-		if in.Body.Auth.GitHub != nil {
-			opt.WithGitHub(in.Body.Auth.GitHub.ClientID, in.Body.Auth.GitHub.ClientSecret)
-			authProviders = append(authProviders, &models.ProjectAuthProvider{
-				Name:         "github",
-				ProjectID:    project.ID,
-				Enabled:      in.Body.Auth.GitHub.Enabled,
-				ClientID:     in.Body.Auth.GitHub.ClientID,
-				ClientSecret: in.Body.Auth.GitHub.ClientSecret,
-				UpdatedAt:    time.Now(),
-			})
-		}
-		if in.Body.Auth.Discord != nil {
-			opt.WithDiscord(in.Body.Auth.Discord.ClientID, in.Body.Auth.Discord.ClientSecret)
-			authProviders = append(authProviders, &models.ProjectAuthProvider{
-				Name:         "discord",
-				ProjectID:    project.ID,
-				Enabled:      in.Body.Auth.Discord.Enabled,
-				ClientID:     in.Body.Auth.Discord.ClientID,
-				ClientSecret: in.Body.Auth.Discord.ClientSecret,
-				UpdatedAt:    time.Now(),
-			})
-		}
+		opt.AuthProviders = in.Body.Auth
 	}
 
 	if needPatchDeployment {
-		err = s.kube.PatchAuthAPIDeployment(ctx, in.Body.Ref, opt)
+		err = s.kube.PatchAuthAPIDeployment(ctx, updated.Ref, opt)
 		if err != nil {
 			return err
 		}
 	}
 
-	if len(authProviders) > 0 {
-		err = s.projectAuthSetting.UpsertOAuthProviders(ctx, authProviders)
+	// Update Database Auth Providers
+	if in.Body.Auth != nil {
+		err := s.pgrest.CreateOrUpdateAuthProvider(ctx, jwt, pgrest.CreateOrUpdateAuthProviderPayload{
+			ProjectID: in.Body.ID,
+			Providers: in.Body.Auth,
+		})
 		if err != nil {
 			return err
 		}
-	}
-
-	err = s.project.UpdateByRef(ctx, in.Body.Ref, projectPayload, objectPayload)
-	if err != nil {
-		return err
 	}
 
 	return nil
@@ -505,6 +468,7 @@ func (s *ProjectService) GetProjectSettings(ctx context.Context, in *dto.GetProj
 	out := &dto.GetProjectSettingsOutput{}
 	out.Body.ID = project.ID
 	out.Body.TrustedOrigins = authSettings.TrustedOrigins
+	out.Body.ProxyURL = authSettings.ProxyURL
 	out.Body.CreatedAt = project.CreatedAt.Format(time.RFC3339)
 	out.Body.UpdatedAt = project.UpdatedAt.Format(time.RFC3339)
 

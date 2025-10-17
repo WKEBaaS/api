@@ -2,10 +2,11 @@
 package repo
 
 import (
-	"baas-api/models"
 	"context"
 	"errors"
 	"log/slog"
+
+	"baas-api/models"
 
 	"github.com/samber/lo"
 	"gorm.io/gorm"
@@ -57,6 +58,7 @@ func (r *ProjectAuthSettingRepository) FindByProjectID(ctx context.Context, proj
 		slog.ErrorContext(ctx, "Failed to find project auth setting", "error", err)
 		return nil, ErrDatabaseError
 	}
+
 	return &setting, nil
 }
 
