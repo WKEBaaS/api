@@ -3,6 +3,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"baas-api/utils"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
 
@@ -109,11 +111,21 @@ func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjec
 
 	///// Create Kubernetes resources /////
 	ref := project.Ref
-	publicKey, privateKey, err := utils.NewEd25519JWKStringified(ctx)
+	jwkID, err := uuid.NewV7()
+	if err != nil {
+		return nil, nil, errors.New("failed to generate JWK ID")
+	}
+
+	publicKey, privateKey, err := utils.NewEd25519JWKWithKIDStringified(ctx, jwkID.String())
 	if err != nil {
 		return nil, nil, err
 	}
-	err = s.kube.CreateJWKSConfigMap(ctx, ref, publicKey, privateKey)
+	err = s.kube.CreateJWKSConfigMap(ctx, kubeproject.CreateJWKSConfigMapOption{
+		Ref:        ref,
+		KID:        jwkID.String(),
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+	})
 	if err != nil {
 		return nil, nil, err
 	}

@@ -56,3 +56,26 @@ func NewEd25519JWKStringified(ctx context.Context) (string, string, error) {
 
 	return string(publicJSON), string(privateJSON), nil
 }
+
+func NewEd25519JWKWithKIDStringified(ctx context.Context, kid string) (string, string, error) {
+	jwkKey, privateKey, err := NewEd25519JWK(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	jwkKey.Set(jwk.KeyIDKey, kid)
+
+	publicJSON, err := json.Marshal(jwkKey)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to marshal JWK to JSON:", "error", err)
+		return "", "", errors.New("failed to marshal JWK to JSON")
+	}
+
+	privateJSON, err := json.Marshal(privateKey)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to marshal private JWK to JSON:", "error", err)
+		return "", "", errors.New("failed to marshal private JWK to JSON")
+	}
+
+	return string(publicJSON), string(privateJSON), nil
+}

@@ -104,7 +104,7 @@ func (s *KubeProjectService) CreateAuthAPIDeployment(ctx context.Context, ref st
 					Containers: []corev1.Container{
 						{
 							Name:  authContainerName,
-							Image: "ghcr.io/wkebaas/project-auth:v0.0.13",
+							Image: "ghcr.io/wkebaas/project-auth:v0.0.22",
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 3000,

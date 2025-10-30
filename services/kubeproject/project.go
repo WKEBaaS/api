@@ -18,7 +18,7 @@ import (
 type KubeProjectServiceInterface interface {
 	// === 基礎設施層 ===
 	// Prepare Cluster Required Resources
-	CreateJWKSConfigMap(ctx context.Context, ref string, publicKey string, privateKey string) error
+	CreateJWKSConfigMap(ctx context.Context, opt CreateJWKSConfigMapOption) error
 	DeleteJWKSConfigMap(ctx context.Context, ref string) error
 
 	// CNPG Cluster 管理
