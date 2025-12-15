@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const MIGRATION_FINISHED_TTL_SECONDS = 300
+const MigrationFinishedTTLSeconds = 300
 
 func (s *KubeProjectService) CreateMigrationJob(ctx context.Context, ref string) error {
 	migJobName := s.GetMigrationJobName(ref)
@@ -72,7 +72,7 @@ func (s *KubeProjectService) CreateMigrationJob(ctx context.Context, ref string)
 	_, err := s.clientset.BatchV1().Jobs(s.namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create migration job", "error", err, "jobName", migJobName)
-		return errors.New("Failed to create migration job")
+		return errors.New("failed to create migration job")
 	}
 
 	return nil

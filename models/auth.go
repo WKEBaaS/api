@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -32,7 +33,7 @@ func (User) TableName() string {
 }
 
 type Identity struct {
-	ID           string         `gorm:"type:varchar(21);primaryKey;default:nanoid();not null"`
+	ID           datatypes.UUID `gorm:"type:uuid;primaryKey;default:uuidv7();not null"`
 	ProviderID   string         `gorm:"type:text;not null;uniqueIndex:uq_auth_idp_id"`
 	UserID       string         `gorm:"type:varchar(21);not null;index"` // 外鍵，建議加上索引
 	IdentityData datatypes.JSON `gorm:"type:jsonb;not null"`
@@ -48,4 +49,19 @@ type Identity struct {
 // TableName 指定 GORM 使用的資料表名稱 (包含 schema)
 func (Identity) TableName() string {
 	return "auth.identities"
+}
+
+type Group struct {
+	ID          datatypes.UUID `gorm:"type:uuid;primaryKey;default:uuidv7();column:id"`
+	Name        string         `gorm:"type:varchar(255);not null;unique;column:name"`
+	Description *string        `gorm:"type:text;column:description"`
+	CreatedAt   time.Time      `gorm:"type:timestamptz;not null;default:current_timestamp;column:created_at"`
+	UpdatedAt   time.Time      `gorm:"type:timestamptz;not null;default:current_timestamp;column:updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"type:timestamptz;index;column:deleted_at"`
+	IsEnabled   bool           `gorm:"type:boolean;default:true;column:is_enabled"`
+	DisplayName string         `gorm:"type:varchar(255);not null;default:'';column:display_name"`
+}
+
+func (Group) TableName() string {
+	return "auth.groups"
 }

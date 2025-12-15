@@ -1,4 +1,4 @@
-// Package kube
+// Package kubeproject
 //
 // kubernetes related repository for project management
 package kubeproject

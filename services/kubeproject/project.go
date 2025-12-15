@@ -1,4 +1,4 @@
-// Package kube
+// Package kubeproject
 //
 // kubernetes related repository for project management
 package kubeproject
@@ -9,6 +9,7 @@ import (
 
 	"baas-api/config"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -33,6 +34,7 @@ type KubeProjectServiceInterface interface {
 	CreateMigrationJob(ctx context.Context, ref string) error
 
 	// Database Role Management
+	FindDatabaseRoleSecret(ctx context.Context, ref string, role string) (*corev1.Secret, error)
 	FindDatabaseRolePassword(ctx context.Context, ref, role string) (*string, error)
 	CreateDatabaseRoleSecret(ctx context.Context, ref, role, password string) error
 	UpdateDatabaseRoleSecret(ctx context.Context, ref, role, password string) error

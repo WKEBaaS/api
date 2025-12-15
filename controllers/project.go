@@ -10,6 +10,7 @@ import (
 	"baas-api/dto"
 	"baas-api/services/kubeproject"
 	"baas-api/services/project"
+	"baas-api/services/usersdb"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/sse"
@@ -23,14 +24,20 @@ type ProjectControllerInterface interface {
 	getProjectSettings(ctx context.Context, in *dto.GetProjectSettingsInput) (*dto.GetProjectSettingsOutput, error)
 	createProject(ctx context.Context, in *dto.CreateProjectInput) (*dto.CreateProjectOutput, error)
 	deleteProjectByRef(ctx context.Context, in *dto.DeleteProjectByIDInput) (*dto.DeleteProjectByIDOutput, error)
-	getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error)
 	resetDatabasePassword(ctx context.Context, in *dto.ResetDatabasePasswordInput) (*dto.ResetDatabasePasswordOutput, error)
+	getUsersProjects(ctx context.Context, in *dto.GetUsersProjectsInput) (*dto.GetUsersProjectsOutput, error)
+	getUsersRootClasses(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetUsersFirstLevelClassesOutput, error)
+	getUsersChildClasses(ctx context.Context, in *dto.GetUsersChildClassesInput) (*dto.GetUsersChildClassesOutput, error)
+	getUsersClassByID(ctx context.Context, in *dto.GetUsersClassByIDInput) (*dto.GetUsersClassByIDOutput, error)
+	getUsersClassPermissions(ctx context.Context, in *dto.GetUsersClassPermissionsInput) (*dto.GetUsersClassPermissionsOutput, error)
+	updateUsersClassPermissions(ctx context.Context, in *dto.UpdateUsersClassPermissionsInput) (*struct{}, error)
 }
 
 type ProjectController struct {
 	config         *config.Config                          `di.inject:"config"`
 	kubeProject    kubeproject.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
 	projectService project.ProjectServiceInterface         `di.inject:"projectService"`
+	usersdb        usersdb.UsersDBServiceInterface         `di.inject:"usersdbService"`
 }
 
 func NewProjectController() ProjectControllerInterface {
@@ -135,6 +142,56 @@ func (c *ProjectController) RegisterProjectAPIs(api huma.API) {
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.resetDatabasePassword)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-users-root-classes",
+		Method:      "GET",
+		Path:        "/project/root-classes",
+		Summary:     "Get User's Root Classes",
+		Description: "Retrieve the root classes for the authenticated user in the specified project.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.getUsersRootClasses)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-users-child-classes",
+		Method:      "GET",
+		Path:        "/project/child-classes",
+		Summary:     "Get User's Child Classes",
+		Description: "Retrieve the child classes for a given parent class ID (PCID) for the authenticated user in the specified project.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.getUsersChildClasses)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-users-class-by-id",
+		Method:      "GET",
+		Path:        "/project/class-by-id",
+		Summary:     "Get User's Class by ID",
+		Description: "Retrieve a specific class by its ID for the authenticated user in the specified project.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.getUsersClassByID)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-users-class-permissions",
+		Method:      "GET",
+		Path:        "/project/class-permissions",
+		Summary:     "Get User's Class Permissions",
+		Description: "Retrieve permissions for a specific class ID for the authenticated user in the specified project.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.getUsersClassPermissions)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "update-users-class-permissions",
+		Method:      "PUT",
+		Path:        "/project/class-permissions",
+		Summary:     "Update User's Class Permissions",
+		Description: "Update permissions for a specific class ID for the authenticated user in the specified project.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.updateUsersClassPermissions)
 }
 
 func (c *ProjectController) getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error) {
@@ -289,4 +346,120 @@ func (c *ProjectController) resetDatabasePassword(ctx context.Context, in *dto.R
 	}
 
 	return out, nil
+}
+
+func (c *ProjectController) getUsersRootClasses(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetUsersFirstLevelClassesOutput, error) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	classes, err := c.usersdb.GetRootClasses(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &dto.GetUsersFirstLevelClassesOutput{}
+	out.Body.Classes = classes
+	return out, nil
+}
+
+func (c *ProjectController) getUsersChildClasses(ctx context.Context, in *dto.GetUsersChildClassesInput) (*dto.GetUsersChildClassesOutput, error) {
+	// 1. Get User Session
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Connect to the specific project/tenant DB
+	// Uses in.Ref to find the DB, and session.UserID for logging/permissions
+	// "superuser" is kept consistent with your example, but adjust if role logic differs here
+	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Call DAO
+	// Pass the active 'db' connection and the 'pcid' from input
+	classes, err := c.usersdb.GetChildClasses(ctx, db, in.PCID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Construct Output
+	out := &dto.GetUsersChildClassesOutput{}
+	out.Body.Classes = classes
+
+	return out, nil
+}
+
+func (c *ProjectController) getUsersClassByID(ctx context.Context, in *dto.GetUsersClassByIDInput) (*dto.GetUsersClassByIDOutput, error) {
+	// 1. Get User Session
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Connect to the specific project/tenant DB
+	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Call DAO
+	class, err := c.usersdb.GetClassByID(ctx, db, in.ClassID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Construct Output
+	out := &dto.GetUsersClassByIDOutput{}
+	out.Body.Class = *class
+
+	return out, nil
+}
+
+func (c *ProjectController) getUsersClassPermissions(ctx context.Context, in *dto.GetUsersClassPermissionsInput) (*dto.GetUsersClassPermissionsOutput, error) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	permissions, err := c.usersdb.GetClassPermissions(ctx, db, in.ClassID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &dto.GetUsersClassPermissionsOutput{}
+	out.Body.Permissions = permissions
+
+	return out, nil
+}
+
+func (c *ProjectController) updateUsersClassPermissions(ctx context.Context, in *dto.UpdateUsersClassPermissionsInput) (*struct{}, error) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.usersdb.UpdateClassPermissions(ctx, db, in.ClassID, in.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }

@@ -21,6 +21,7 @@ const (
 )
 
 // ===== Auth API =====
+
 func (s *KubeProjectService) GetProjectHost(ref string) string {
 	return ref + "." + s.config.App.ExternalDomain
 }
@@ -64,6 +65,7 @@ func (*KubeProjectService) GetAuthAPIServiceName(ref string) string {
 }
 
 // ===== REST API (PostgREST) =====
+
 func (*KubeProjectService) GetRESTAPIDeploymentName(ref string) string {
 	return generateResourceName(ref, RestAPIComponent)
 }

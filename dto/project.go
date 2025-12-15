@@ -103,3 +103,48 @@ type GetProjectSettingsOutput struct {
 		UpdatedAt      string              `json:"updatedAt" doc:"Project last update timestamp"`
 	}
 }
+
+type GetUsersFirstLevelClassesOutput struct {
+	Body struct {
+		Classes []models.Class `json:"classes" doc:"List of first-level classes"`
+	}
+}
+
+type GetUsersChildClassesInput struct {
+	Ref  string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+	PCID string `json:"pcid" query:"pcid" doc:"Parent Class ID"`
+}
+
+type GetUsersChildClassesOutput struct {
+	Body struct {
+		Classes []models.Class `json:"classes" doc:"List of child classes"`
+	}
+}
+
+type GetUsersClassByIDInput struct {
+	Ref     string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+	ClassID string `query:"class_id" doc:"Class ID to retrieve"`
+}
+
+type GetUsersClassByIDOutput struct {
+	Body struct {
+		Class models.Class `json:"class" doc:"Class details"`
+	}
+}
+
+type GetUsersClassPermissionsInput struct {
+	Ref     string `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+	ClassID string `query:"class_id" doc:"Class ID to retrieve permissions for"`
+}
+
+type GetUsersClassPermissionsOutput struct {
+	Body struct {
+		Permissions []models.Permission `json:"permissions" doc:"List of permissions for the class"`
+	}
+}
+
+type UpdateUsersClassPermissionsInput struct {
+	Ref     string              `json:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+	ClassID string              `json:"class_id" doc:"Class ID to update permissions for"`
+	Body    []models.Permission `json:"body" doc:"List of permissions to set for the class"`
+}

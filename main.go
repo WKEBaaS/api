@@ -14,6 +14,7 @@ import (
 	"baas-api/services/pgrest"
 	"baas-api/services/project"
 	"baas-api/services/s3"
+	"baas-api/services/usersdb"
 
 	"github.com/goioc/di"
 	"github.com/minio/madmin-go/v4"
@@ -91,18 +92,19 @@ func init() {
 	_, _ = di.RegisterBeanInstance("minioAdminClient", minioAdminClient)
 
 	//////////// Repositories //////////
-	_, _ = di.RegisterBean("entityRepository", reflect.TypeOf((*repo.EntityRepository)(nil)))
-	_, _ = di.RegisterBean("projectRepository", reflect.TypeOf((*repo.ProjectRepository)(nil)))
-	_, _ = di.RegisterBean("projectAuthSettingRepository", reflect.TypeOf((*repo.ProjectAuthSettingRepository)(nil)))
+	_, _ = di.RegisterBean("entityRepository", reflect.TypeFor[*repo.EntityRepository]())
+	_, _ = di.RegisterBean("projectRepository", reflect.TypeFor[*repo.ProjectRepository]())
+	_, _ = di.RegisterBean("projectAuthSettingRepository", reflect.TypeFor[*repo.ProjectAuthSettingRepository]())
 
 	//////////// Services //////////
-	_, _ = di.RegisterBean("pgrestService", reflect.TypeOf((*pgrest.PgRestService)(nil)))
-	_, _ = di.RegisterBean("s3Service", reflect.TypeOf((*s3.S3Service)(nil)))
-	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeOf((*kubeproject.KubeProjectService)(nil)))
-	_, _ = di.RegisterBean("projectService", reflect.TypeOf((*project.ProjectService)(nil)))
+	_, _ = di.RegisterBean("pgrestService", reflect.TypeFor[*pgrest.PgRestService]())
+	_, _ = di.RegisterBean("s3Service", reflect.TypeFor[*s3.S3Service]())
+	_, _ = di.RegisterBean("kubeProjectService", reflect.TypeFor[*kubeproject.KubeProjectService]())
+	_, _ = di.RegisterBean("projectService", reflect.TypeFor[*project.ProjectService]())
+	_, _ = di.RegisterBean("usersdbService", reflect.TypeFor[*usersdb.UsersDBService]())
 
 	//////////// Controllers //////////
-	_, _ = di.RegisterBean("projectController", reflect.TypeOf((*controllers.ProjectController)(nil)))
+	_, _ = di.RegisterBean("projectController", reflect.TypeFor[*controllers.ProjectController]())
 
 	/////////// Initialize Container //////////
 	_ = di.InitializeContainer()

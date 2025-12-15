@@ -1,10 +1,11 @@
 package repo
 
 import (
-	"baas-api/models"
 	"context"
 	"errors"
 	"log/slog"
+
+	"baas-api/models"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/samber/lo"
@@ -44,6 +45,8 @@ type ProjectRepositoryInterface interface {
 	FindAllByUserID(ctx context.Context, userID string) ([]*models.ProjectView, error)
 	// UpdateByRef 更新專案資訊 (包含關聯的 Object)，依 Reference。
 	UpdateByRef(ctx context.Context, ref string, project any, object any) error
+	// IsOwner 檢查使用者是否為專案擁有者。
+	IsOwner(ctx context.Context, projectRef string, userID string) (bool, error)
 }
 
 type ProjectRepository struct {
@@ -308,4 +311,18 @@ func (r *ProjectRepository) UpdateByRef(ctx context.Context, ref string, project
 	})
 
 	return err
+}
+
+func (r *ProjectRepository) IsOwner(ctx context.Context, projectRef string, userID string) (bool, error) {
+	var project models.ProjectView
+	if err := r.db.WithContext(ctx).
+		Where("reference = ? AND owner_id = ?", projectRef, userID).
+		First(&project).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		slog.ErrorContext(ctx, "Failed to check project ownership", "projectRef", projectRef, "userID", userID, "error", err)
+		return false, errors.New("failed to check project ownership")
+	}
+	return true, nil
 }

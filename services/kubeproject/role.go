@@ -21,7 +21,9 @@ func (s *KubeProjectService) buildDatabaseRoleSecret(ref string, role string, pa
 			Name:      secretName,
 			Namespace: s.namespace,
 			Labels: map[string]string{
-				"cnpg.io/reload": "true",
+				"cnpg.io/cluster":  ref,
+				"cnpg.io/reload":   "true",
+				"cnpg.io/userType": "app",
 			},
 		},
 		Type: "kubernetes.io/basic-auth",
@@ -81,6 +83,16 @@ func (s *KubeProjectService) FindDatabaseRolePassword(ctx context.Context, ref s
 
 	password := string(passwordBytes)
 	return &password, nil
+}
+
+func (s *KubeProjectService) FindDatabaseRoleSecret(ctx context.Context, ref string, role string) (*corev1.Secret, error) {
+	secretName := s.GetDatabaseRoleSecretName(ref, role)
+	secret, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		slog.Error("Failed to read database secret", "error", err)
+		return nil, ErrFailedToReadDatabaseSecret
+	}
+	return secret, nil
 }
 
 func (s *KubeProjectService) DeleteDatabaseRoleSecret(ctx context.Context, ref string, role string) error {

@@ -1,3 +1,7 @@
+# build artifacts
+baas-api
+
+# Sensitive files
 .env
 *.pem
 *.jwk
