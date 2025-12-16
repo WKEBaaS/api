@@ -7,7 +7,6 @@ import (
 	"baas-api/models"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // GetRootClasses 取得根節點 (Level 0) 與第一層子節點 (Level 1)
@@ -54,6 +53,23 @@ func (s *UsersDBService) GetChildClasses(ctx context.Context, db *gorm.DB, pcid 
 	return classes, nil
 }
 
+func (s *UsersDBService) GetClassesChild(ctx context.Context, db *gorm.DB, classIDs []string) ([]models.ClassWithPCID, error) {
+	var classes []models.ClassWithPCID
+
+	err := db.WithContext(ctx).
+		Debug().
+		Table("dbo.classes AS c").
+		Select("c.id, c.chinese_name, i.pcid").
+		Joins("JOIN dbo.inheritances AS i ON i.ccid = c.id").
+		Where("i.pcid in (?)", classIDs).
+		Find(&classes).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return classes, nil
+}
+
 func (s *UsersDBService) GetClassByID(ctx context.Context, db *gorm.DB, classID string) (*models.Class, error) {
 	var class models.Class
 
@@ -67,8 +83,8 @@ func (s *UsersDBService) GetClassByID(ctx context.Context, db *gorm.DB, classID 
 	return &class, nil
 }
 
-func (s *UsersDBService) GetClassPermissions(ctx context.Context, db *gorm.DB, classID string) ([]models.Permission, error) {
-	var permissions []models.Permission
+func (s *UsersDBService) GetClassPermissions(ctx context.Context, db *gorm.DB, classID string) ([]models.PermissionWithRoleName, error) {
+	var permissions []models.PermissionWithRoleName
 
 	selectClause := `
 		p.*,
@@ -97,23 +113,29 @@ func (s *UsersDBService) GetClassPermissions(ctx context.Context, db *gorm.DB, c
 
 // UpdateClassPermissions Insert or Update class permissions
 func (s *UsersDBService) UpdateClassPermissions(ctx context.Context, db *gorm.DB, classID string, permissions []models.Permission) error {
-	// Begin a transaction
-	tx := db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	// Upsert each permission
-	for _, perm := range permissions {
-		perm.ClassID = classID
-		if err := tx.Clauses(clause.OnConflict{
-			UpdateAll: true,
-		}).Create(&perm).Error; err != nil {
-			tx.Rollback()
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 先刪除舊的權限
+		// 注意：這裡使用 Unscoped() 是可選的，如果你使用了 Soft Delete 但想要真的刪除資料，請加上 Unscoped()
+		if err := tx.Where("class_id = ?", classID).Delete(&models.Permission{}).Error; err != nil {
 			return err
 		}
-	}
 
-	// Commit the transaction
-	return tx.Commit().Error
+		// 2. 如果傳入的權限列表為空，代表只是想清空權限，直接返回
+		if len(permissions) == 0 {
+			return nil
+		}
+
+		// 3. 強制覆蓋 classID，防止呼叫端傳入錯誤的 ID，確保資料一致性
+		// 由於 permissions 是 slice，這裡修改會影響到底層 array，這通常是預期行為
+		for i := range permissions {
+			permissions[i].ClassID = classID
+		}
+
+		// 4. 直接批量創建 (Batch Create)
+		if err := tx.Create(&permissions).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

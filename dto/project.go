@@ -139,12 +139,25 @@ type GetUsersClassPermissionsInput struct {
 
 type GetUsersClassPermissionsOutput struct {
 	Body struct {
-		Permissions []models.Permission `json:"permissions" doc:"List of permissions for the class"`
+		Permissions []models.PermissionWithRoleName `json:"permissions" doc:"List of permissions for the class"`
 	}
 }
 
 type UpdateUsersClassPermissionsInput struct {
-	Ref     string              `json:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
-	ClassID string              `json:"class_id" doc:"Class ID to update permissions for"`
-	Body    []models.Permission `json:"body" doc:"List of permissions to set for the class"`
+	Body struct {
+		Ref         string              `json:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+		ClassID     string              `json:"class_id" doc:"Class ID to update permissions for"`
+		Permissions []models.Permission `json:"permissions" doc:"List of permissions to set for the class"`
+	}
+}
+
+type GetUsersClassesChildInput struct {
+	Ref      string   `query:"ref" example:"hisqrzwgndjcycmkwpnj" doc:"Project reference (20 lower characters [a-z])"`
+	ClassIDs []string `query:"class_ids" doc:"List of Class IDs to retrieve children for"`
+}
+
+type GetUsersClassesChildOutput struct {
+	Body struct {
+		Classes []models.ClassWithPCID `json:"classes" doc:"List of classes with their parent class IDs"`
+	}
 }

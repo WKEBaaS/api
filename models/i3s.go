@@ -85,6 +85,12 @@ type Class struct {
 	IsChild  bool `gorm:"type:boolean;default:false;not null" json:"is_child"`
 }
 
+type ClassWithPCID struct {
+	ID          string  `gorm:"primaryKey;type:varchar(21);default:nanoid();not null" json:"id"`
+	ChineseName *string `gorm:"type:varchar(256)" json:"chinese_name"`
+	PCID        string  `gorm:"type:varchar(21);column:pcid;not null" json:"pcid"`
+}
+
 // TableName specifies the schema and table name strictly
 func (Class) TableName() string {
 	return "dbo.classes"
@@ -110,13 +116,14 @@ func (p PermissionRoleType) Value() (driver.Value, error) {
 
 type Permission struct {
 	ClassID        string             `gorm:"type:varchar(21);not null;uniqueIndex:uq_dbo_permissions,priority:1" json:"class_id"`
-	Class          Class              `gorm:"foreignKey:ClassID;constraint:OnDelete:CASCADE" json:"class"`
 	RoleType       PermissionRoleType `gorm:"type:dbo.permission_role_type;not null;uniqueIndex:uq_dbo_permissions,priority:2" json:"role_type"`
 	RoleID         string             `gorm:"type:uuid;not null;uniqueIndex:uq_dbo_permissions,priority:3" json:"role_id"`
 	PermissionBits int16              `gorm:"type:smallint;default:1;not null" json:"permission_bits"`
+}
 
-	// Additional field for response purposes
-	RoleName string `json:"role_name,omitempty"`
+type PermissionWithRoleName struct {
+	Permission
+	RoleName string `json:"role_name"`
 }
 
 func (Permission) TableName() string {

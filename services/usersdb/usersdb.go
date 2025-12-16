@@ -22,9 +22,10 @@ type UsersDBServiceInterface interface {
 	// GetDB by baas-project ref
 	GetDB(ctx context.Context, ref, userID, role string) (*gorm.DB, error)
 	GetRootClasses(ctx context.Context, db *gorm.DB) ([]models.Class, error)
+	GetClassesChild(ctx context.Context, db *gorm.DB, classIDs []string) ([]models.ClassWithPCID, error)
 	GetChildClasses(ctx context.Context, db *gorm.DB, pcid string) ([]models.Class, error)
 	GetClassByID(ctx context.Context, db *gorm.DB, classID string) (*models.Class, error)
-	GetClassPermissions(ctx context.Context, db *gorm.DB, classID string) ([]models.Permission, error)
+	GetClassPermissions(ctx context.Context, db *gorm.DB, classID string) ([]models.PermissionWithRoleName, error)
 	UpdateClassPermissions(ctx context.Context, db *gorm.DB, classID string, permissions []models.Permission) error
 }
 

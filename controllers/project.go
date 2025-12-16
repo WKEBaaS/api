@@ -30,6 +30,7 @@ type ProjectControllerInterface interface {
 	getUsersChildClasses(ctx context.Context, in *dto.GetUsersChildClassesInput) (*dto.GetUsersChildClassesOutput, error)
 	getUsersClassByID(ctx context.Context, in *dto.GetUsersClassByIDInput) (*dto.GetUsersClassByIDOutput, error)
 	getUsersClassPermissions(ctx context.Context, in *dto.GetUsersClassPermissionsInput) (*dto.GetUsersClassPermissionsOutput, error)
+	getUsersClassesChild(ctx context.Context, in *dto.GetUsersClassesChildInput) (*dto.GetUsersClassesChildOutput, error)
 	updateUsersClassPermissions(ctx context.Context, in *dto.UpdateUsersClassPermissionsInput) (*struct{}, error)
 }
 
@@ -192,6 +193,16 @@ func (c *ProjectController) RegisterProjectAPIs(api huma.API) {
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.updateUsersClassPermissions)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-users-classes-child",
+		Method:      "GET",
+		Path:        "/project/child-classes",
+		Summary:     "Get User's Child Classes",
+		Description: "Retrieve the child classes for a given parent class ID (PCID) for the authenticated user in the specified project.",
+		Tags:        []string{"Project"},
+		Middlewares: huma.Middlewares{authMiddleware},
+	}, c.getUsersClassesChild)
 }
 
 func (c *ProjectController) getProjectByRef(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetProjectByRefOutput, error) {
@@ -451,15 +462,37 @@ func (c *ProjectController) updateUsersClassPermissions(ctx context.Context, in 
 		return nil, err
 	}
 
-	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	db, err := c.usersdb.GetDB(ctx, in.Body.Ref, session.UserID, "superuser")
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.usersdb.UpdateClassPermissions(ctx, db, in.ClassID, in.Body)
+	err = c.usersdb.UpdateClassPermissions(ctx, db, in.Body.ClassID, in.Body.Permissions)
 	if err != nil {
 		return nil, err
 	}
 
 	return nil, nil
+}
+
+func (c *ProjectController) getUsersClassesChild(ctx context.Context, in *dto.GetUsersClassesChildInput) (*dto.GetUsersClassesChildOutput, error) {
+	session, err := GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	classes, err := c.usersdb.GetClassesChild(ctx, db, in.ClassIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &dto.GetUsersClassesChildOutput{}
+	out.Body.Classes = classes
+
+	return out, nil
 }
