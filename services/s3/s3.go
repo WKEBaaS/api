@@ -2,13 +2,15 @@
 package s3
 
 import (
-	"baas-api/config"
 	"context"
 	"errors"
 	"log/slog"
 
+	"baas-api/config"
+
 	"github.com/minio/madmin-go/v4"
 	"github.com/minio/minio-go/v7"
+	"github.com/samber/do/v2"
 )
 
 type S3ServiceInterface interface {
@@ -21,12 +23,20 @@ type S3ServiceInterface interface {
 }
 
 type S3Service struct {
-	config      *config.Config      `di.inject:"config"`
-	client      *minio.Client       `di.inject:"minioClient"`
-	adminClient *madmin.AdminClient `di.inject:"minioAdminClient"`
+	config      *config.Config      `do:""`
+	client      *minio.Client       `do:""`
+	adminClient *madmin.AdminClient `do:""`
 }
 
-func NewS3Service() S3ServiceInterface {
+func NewS3Service(i do.Injector) (S3ServiceInterface, error) {
+	return &S3Service{
+		config:      do.MustInvoke[*config.Config](i),
+		client:      do.MustInvoke[*minio.Client](i),
+		adminClient: do.MustInvoke[*madmin.AdminClient](i),
+	}, nil
+}
+
+func NewS3ServiceOld() S3ServiceInterface {
 	return &S3Service{}
 }
 

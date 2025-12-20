@@ -21,6 +21,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
+	"github.com/samber/do/v2"
 	"github.com/samber/lo"
 )
 
@@ -47,21 +48,32 @@ type ProjectServiceInterface interface {
 }
 
 type ProjectService struct {
-	config *config.Config `di.inject:"config"`
+	config *config.Config
 	// Services
-	kube   kubeproject.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
-	pgrest pgrest.PgRestServiceInterface           `di.inject:"pgrestService"`
-	s3     s3.S3ServiceInterface                   `di.inject:"s3Service"`
+	kube   kubeproject.KubeProjectServiceInterface
+	pgrest pgrest.PgRestServiceInterface
+	s3     s3.S3ServiceInterface
 	// Repositories
-	entity             repo.EntityRepositoryInterface             `di.inject:"entityRepository"`
-	project            repo.ProjectRepositoryInterface            `di.inject:"projectRepository"`
-	projectAuthSetting repo.ProjectAuthSettingRepositoryInterface `di.inject:"projectAuthSettingRepository"`
+	// entity             repo.EntityRepositoryInterface             `do:""`
+	project            repo.ProjectRepositoryInterface
+	projectAuthSetting repo.ProjectAuthSettingRepositoryInterface
 }
 
-func NewProjectService() ProjectServiceInterface {
-	service := &ProjectService{}
-	return service
+func NewProjectService(i do.Injector) (ProjectServiceInterface, error) {
+	service := &ProjectService{
+		config:             do.MustInvoke[*config.Config](i),
+		kube:               do.MustInvoke[kubeproject.KubeProjectServiceInterface](i),
+		pgrest:             do.MustInvoke[pgrest.PgRestServiceInterface](i),
+		s3:                 do.MustInvoke[s3.S3ServiceInterface](i),
+		project:            do.MustInvoke[repo.ProjectRepositoryInterface](i),
+		projectAuthSetting: do.MustInvoke[repo.ProjectAuthSettingRepositoryInterface](i),
+	}
+	return service, nil
 }
+
+var Package = do.Package(
+	do.Lazy(NewProjectService),
+)
 
 func (s *ProjectService) CreateProject(ctx context.Context, in *dto.CreateProjectInput, jwt string, userID *string) (*dto.CreateProjectOutput, *CreateProjectInternalOutput, error) {
 	// Cleanup if any error occurs

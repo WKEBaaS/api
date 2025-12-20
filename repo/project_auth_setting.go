@@ -8,6 +8,7 @@ import (
 
 	"baas-api/models"
 
+	"github.com/samber/do/v2"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -31,13 +32,14 @@ type ProjectAuthSettingRepositoryInterface interface {
 }
 
 type ProjectAuthSettingRepository struct {
-	db *gorm.DB `di.inject:"db"`
+	db *gorm.DB
 }
 
-func NewProjectAuthSettingRepository(db *gorm.DB) ProjectAuthSettingRepositoryInterface {
+func NewProjectAuthSettingRepository(i do.Injector) (ProjectAuthSettingRepositoryInterface, error) {
+	db := do.MustInvoke[*gorm.DB](i)
 	return &ProjectAuthSettingRepository{
 		db: db,
-	}
+	}, nil
 }
 
 func (r *ProjectAuthSettingRepository) Create(ctx context.Context, s *models.ProjectAuthSettings) error {

@@ -5,10 +5,10 @@ package kubeproject
 
 import (
 	"context"
-	"log"
 
 	"baas-api/config"
 
+	"github.com/samber/do/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -63,39 +63,43 @@ type KubeProjectServiceInterface interface {
 }
 
 type KubeProjectService struct {
-	kubeConfig    *rest.Config           `di.inject:"kubeConfig"`
-	clientset     *kubernetes.Clientset  `di.inject:"kubeClientset"`
-	dynamicClient *dynamic.DynamicClient `di.inject:"kubeDynamicClient"`
-	config        *config.Config         `di.inject:"config"`
+	config        *config.Config `do:""`
+	kubeConfig    *rest.Config
+	clientset     *kubernetes.Clientset
+	dynamicClient *dynamic.DynamicClient
 	namespace     string
 }
 
-func (s *KubeProjectService) PostConstruct() error {
-	s.namespace = s.config.Kube.Project.Namespace
-	return nil
-}
+var Package = do.Package(
+	do.LazyNamed("kube.project.namespace", func(i do.Injector) (string, error) {
+		cfg := do.MustInvoke[*config.Config](i)
+		return cfg.Kube.Project.Namespace, nil
+	}),
+	do.Lazy(NewKubeProjectService),
+)
 
-func NewKubeProjectService(config *config.Config) KubeProjectServiceInterface {
-	repo := &KubeProjectService{}
+func NewKubeProjectService(i do.Injector) (KubeProjectServiceInterface, error) {
+	cfg := do.MustInvoke[*config.Config](i)
+	svc := &KubeProjectService{}
 
-	kc, err := clientcmd.BuildConfigFromFlags("", config.Kube.ConfigPath)
+	kc, err := clientcmd.BuildConfigFromFlags("", cfg.Kube.ConfigPath)
 	if err != nil {
-		log.Panicf("Failed to build kube config %+v", err)
+		return nil, err
 	}
 	clientset, err := kubernetes.NewForConfig(kc)
 	if err != nil {
-		log.Panicf("Failed to create kube client %+v", err)
+		return nil, err
 	}
 	dynamicClient, err := dynamic.NewForConfig(kc)
 	if err != nil {
-		log.Panicf("Failed to create dynamic client %+v", err)
+		return nil, err
 	}
-	repo.kubeConfig = kc
-	repo.kubeConfig.WarningHandler = rest.NoWarnings{}
-	repo.clientset = clientset
-	repo.dynamicClient = dynamicClient
-	repo.config = config
-	repo.namespace = config.Kube.Project.Namespace
+	svc.kubeConfig = kc
+	svc.kubeConfig.WarningHandler = rest.NoWarnings{}
+	svc.clientset = clientset
+	svc.dynamicClient = dynamicClient
+	svc.config = cfg
+	svc.namespace = cfg.Kube.Project.Namespace
 
-	return repo
+	return svc, nil
 }

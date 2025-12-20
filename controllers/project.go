@@ -14,6 +14,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/sse"
+	"github.com/samber/do/v2"
 )
 
 type ProjectControllerInterface interface {
@@ -35,14 +36,19 @@ type ProjectControllerInterface interface {
 }
 
 type ProjectController struct {
-	config         *config.Config                          `di.inject:"config"`
-	kubeProject    kubeproject.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
-	projectService project.ProjectServiceInterface         `di.inject:"projectService"`
-	usersdb        usersdb.UsersDBServiceInterface         `di.inject:"usersdbService"`
+	config         *config.Config                          `do:""`
+	kubeProject    kubeproject.KubeProjectServiceInterface `do:""`
+	projectService project.ProjectServiceInterface         `do:""`
+	usersdb        usersdb.UsersDBServiceInterface         `do:""`
 }
 
-func NewProjectController() ProjectControllerInterface {
-	return &ProjectController{}
+func NewProjectController(i do.Injector) (ProjectControllerInterface, error) {
+	return &ProjectController{
+		config:         do.MustInvoke[*config.Config](i),
+		kubeProject:    do.MustInvoke[kubeproject.KubeProjectServiceInterface](i),
+		projectService: do.MustInvoke[project.ProjectServiceInterface](i),
+		usersdb:        do.MustInvoke[usersdb.UsersDBServiceInterface](i),
+	}, nil
 }
 
 func (c *ProjectController) RegisterProjectAPIs(api huma.API) {
@@ -195,11 +201,11 @@ func (c *ProjectController) RegisterProjectAPIs(api huma.API) {
 	}, c.updateUsersClassPermissions)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "get-users-classes-child",
+		OperationID: "get-users-classes-child-batched",
 		Method:      "GET",
-		Path:        "/project/child-classes",
-		Summary:     "Get User's Child Classes",
-		Description: "Retrieve the child classes for a given parent class ID (PCID) for the authenticated user in the specified project.",
+		Path:        "/project/child-classes-batched",
+		Summary:     "Get User's Child Classes (Batched)",
+		Description: "Retrieve the child classes for a given parent class ID (PCID) for the authenticated user in the specified project, batched.",
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{authMiddleware},
 	}, c.getUsersClassesChild)

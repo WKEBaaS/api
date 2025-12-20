@@ -4,68 +4,42 @@
 package router
 
 import (
-	"baas-api/config"
 	"fmt"
 	"log/slog"
 	"net/http"
 
+	"baas-api/config"
+	"baas-api/controllers"
+
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humachi"
-	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
+	"github.com/samber/do/v2"
 )
 
-type Options struct {
-	Debug bool `help:"Enable debug mode" short:"d" default:"false"`
+type BaaSRouter struct {
+	config            *config.Config                         `do:""`
+	router            *chi.Mux                               `do:""`
+	v1API             *huma.Group                            `do:"huma.api.v1"`
+	projectController controllers.ProjectControllerInterface `do:""`
 }
 
-func NewAPICli(config *config.Config, controllers ...any) humacli.CLI {
-	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		slog.Info("Option.Debug", "debug", options.Debug)
-		if options.Debug {
-			slog.SetLogLoggerLevel(slog.LevelDebug)
-		}
+func NewBaaSRouter(i do.Injector) (*BaaSRouter, error) {
+	return &BaaSRouter{
+		config:            do.MustInvoke[*config.Config](i),
+		router:            do.MustInvoke[*chi.Mux](i),
+		v1API:             do.MustInvokeNamed[*huma.Group](i, "huma.api.v1"),
+		projectController: do.MustInvoke[controllers.ProjectControllerInterface](i),
+	}, nil
+}
 
-		humaConfig := huma.DefaultConfig("WKE BaaS API", "0.1.0")
-		humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-			"BearerAuth": {
-				Type:         "http",
-				Scheme:       "bearer",
-				BearerFormat: "JWT",
-			},
-		}
+func (r *BaaSRouter) RegisterControllers() {
+	huma.AutoRegister(r.v1API, r.projectController)
+}
 
-		huma.NewError = NewCustomError
-
-		// app := fiber.New()
-		router := chi.NewMux()
-		router.Use(middleware.Logger)
-		router.Use(cors.Handler(cors.Options{
-			AllowedOrigins:   config.App.TrustedOrigins,
-			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-			AllowCredentials: true,
-		}))
-
-		////////// Register APIs //////////
-		api := humachi.New(router, humaConfig)
-		v1Api := huma.NewGroup(api, "/v1")
-
-		// Register controllers
-		for _, controller := range controllers {
-			huma.AutoRegister(v1Api, controller)
-		}
-
-		hooks.OnStart(func() {
-			slog.Info("Starting server", "host", config.App.Host, "port", config.App.Port)
-			err := http.ListenAndServe(fmt.Sprintf("%s:%s", config.App.Host, config.App.Port), router)
-			if err != nil {
-				slog.Error("Failed to start server", "error", err)
-			}
-		})
-	})
-
-	return cli
+func (r *BaaSRouter) Start() {
+	slog.Info("Starting server", "host", r.config.App.Host, "port", r.config.App.Port)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%s", r.config.App.Host, r.config.App.Port), r.router)
+	if err != nil {
+		slog.Error("Failed to start server", "error", err)
+	}
 }

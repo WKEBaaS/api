@@ -8,6 +8,7 @@ import (
 	// "github.com/go-viper/mapstructure/v2"
 	"github.com/go-viper/mapstructure/v2"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/samber/do/v2"
 	"github.com/spf13/viper"
 )
 
@@ -56,7 +57,7 @@ type Config struct {
 	S3       S3Config
 }
 
-func LoadConfig() (*Config, error) {
+func NewConfig(i do.Injector) (*Config, error) {
 	c := &Config{}
 
 	viper.SetConfigName("config")
@@ -81,3 +82,7 @@ func LoadConfig() (*Config, error) {
 
 	return c, nil
 }
+
+var Package = do.Package(
+	do.Lazy(NewConfig),
+)

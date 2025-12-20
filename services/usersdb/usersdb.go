@@ -13,6 +13,7 @@ import (
 	"baas-api/services/kubeproject"
 
 	"github.com/patrickmn/go-cache"
+	"github.com/samber/do/v2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -30,15 +31,23 @@ type UsersDBServiceInterface interface {
 }
 
 type UsersDBService struct {
-	// config *config.Config                          `di.inject:"config"`
-	kube    kubeproject.KubeProjectServiceInterface `di.inject:"kubeProjectService"`
-	project repo.ProjectRepositoryInterface         `di.inject:"projectRepository"`
-	cache   *cache.Cache                            `di.inject:"cache"`
+	// config *config.Config
+	kube    kubeproject.KubeProjectServiceInterface
+	project repo.ProjectRepositoryInterface
+	cache   *cache.Cache
 }
 
-func NewUsersDBService() UsersDBServiceInterface {
-	return &UsersDBService{}
+func NewUsersDBService(i do.Injector) (UsersDBServiceInterface, error) {
+	return &UsersDBService{
+		kube:    do.MustInvoke[kubeproject.KubeProjectServiceInterface](i),
+		project: do.MustInvoke[repo.ProjectRepositoryInterface](i),
+		cache:   do.MustInvoke[*cache.Cache](i),
+	}, nil
 }
+
+var Package = do.Package(
+	do.Lazy(NewUsersDBService),
+)
 
 func (s *UsersDBService) GetDB(ctx context.Context, ref, userID, role string) (*gorm.DB, error) {
 	// 1. 驗證權限

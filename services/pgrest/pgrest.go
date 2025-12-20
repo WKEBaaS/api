@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 
 	"baas-api/config"
+
+	"github.com/samber/do/v2"
 )
 
 type PgRestServiceInterface interface {
@@ -22,12 +24,18 @@ type PgRestServiceInterface interface {
 }
 
 type PgRestService struct {
-	config *config.Config `di.inject:"config"`
+	config *config.Config
 }
 
-func NewPgRestService() PgRestServiceInterface {
-	return &PgRestService{}
+func NewPgRestService(i do.Injector) (PgRestServiceInterface, error) {
+	return &PgRestService{
+		config: do.MustInvoke[*config.Config](i),
+	}, nil
 }
+
+var Package = do.Package(
+	do.Lazy(NewPgRestService),
+)
 
 type PgRestError struct {
 	Code    string  `json:"code"`

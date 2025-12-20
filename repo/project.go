@@ -8,6 +8,7 @@ import (
 	"baas-api/models"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/samber/do/v2"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -53,10 +54,11 @@ type ProjectRepository struct {
 	db *gorm.DB `di.inject:"db"`
 }
 
-func NewProjectRepository(db *gorm.DB) ProjectRepositoryInterface {
+func NewProjectRepository(i do.Injector) (ProjectRepositoryInterface, error) {
+	db := do.MustInvoke[*gorm.DB](i)
 	return &ProjectRepository{
 		db: db,
-	}
+	}, nil
 }
 
 func (r *ProjectRepository) Create(ctx context.Context, name string, description *string, entityID string, userID *string) (*string, *string, error) {
