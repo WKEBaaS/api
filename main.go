@@ -1,17 +1,17 @@
 package main
 
 import (
-	"baas-api/cache"
-	"baas-api/config"
-	"baas-api/controllers"
-	"baas-api/database"
-	"baas-api/repo"
-	"baas-api/router"
-	"baas-api/services/kubeproject"
-	"baas-api/services/pgrest"
-	"baas-api/services/project"
-	"baas-api/services/s3"
-	"baas-api/services/usersdb"
+	"baas-api/internal/authsetting"
+	"baas-api/internal/cache"
+	"baas-api/internal/config"
+	"baas-api/internal/database"
+	"baas-api/internal/kubeproject"
+	"baas-api/internal/middlewares"
+	"baas-api/internal/minio"
+	"baas-api/internal/pgrest"
+	"baas-api/internal/project"
+	"baas-api/internal/router"
+	"baas-api/internal/usersdb"
 
 	"github.com/samber/do/v2"
 )
@@ -24,18 +24,18 @@ func main() {
 	cache.Package(i)
 	database.Package(i)
 
-	// Repositories
-	repo.Package(i)
-
 	// Services
-	s3.Package(i)
+	minio.Package(i)
 	pgrest.Package(i)
 	kubeproject.Package(i)
-	usersdb.Package(i)
-	project.Package(i)
 
-	// Controllers
-	controllers.Package(i)
+	// Middlewares
+	middlewares.Package(i)
+
+	// Domains
+	project.Package(i)
+	authsetting.Package(i)
+	usersdb.Package(i)
 
 	// Router
 	router.Package(i)

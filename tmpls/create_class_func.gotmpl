@@ -1,0 +1,94 @@
+CREATE OR REPLACE FUNCTION {{ .Name }}(
+  {{- range $index, $param := .Params -}}
+    {{ if $index }}, {{ end }}{{ $param.Name }} {{ $param.Type }}
+  {{- end -}}
+)
+    RETURNS SETOF dbo.classes
+    LANGUAGE plpgsql
+    {{ if .Volatility }}VOLATILE{{ else }}STABLE{{ end }}
+    {{ if .Security }}SECURITY {{ .Security }}{{ end }}
+AS $$
+DECLARE
+    v_user_id uuid := auth.jwt() ->> 'sub';
+    v_parent_class_id VARCHAR(21) := '{{ .RootNode.ClassID }}';
+BEGIN
+{{- if .Authenticated }}
+    -- Authentication check
+    IF CURRENT_USER = 'anon' THEN
+        RAISE SQLSTATE 'PT403' USING
+            MESSAGE = 'Authentication required to perform this action.',
+            HINT = 'Please log in and try again.';
+    END IF;
+{{- end }}
+
+{{- if .RootNode.CheckBits }}
+    -- RootNode permission check
+    DECLARE
+        v_permission_bits INTEGER;
+    BEGIN
+        v_permission_bits := api.get_permission_bits('{{ .RootNode.ClassID }}');
+        IF v_permission_bits & {{ .RootNode.CheckBits }} != {{ .RootNode.CheckBits }} THEN
+            RAISE SQLSTATE 'PT403' USING
+                MESSAGE = 'You do not have permission to perform this action.',
+                HINT = 'Required permission bits: {{ .RootNode.CheckBits }}, your permission bits: ' || v_permission_bits || '.';
+        END IF;
+    END;
+{{- end }}
+
+{{- template "insertNode" .Nodes -}}
+
+    RETURN;
+END;
+$$;
+
+{{ define "insertNode" }}
+-- Scope for {{ if .Fields.ChineseName.Value }}{{ .Fields.ChineseName.Value }}{{ else }}Node{{ end }}
+    DECLARE
+        v_parent_class_id VARCHAR(21) := v_parent_class_id;
+    BEGIN
+        -- Insert Node
+        SELECT id INTO v_parent_class_id
+        FROM dbo.fn_insert_class(
+            v_parent_class_id,
+            {{ template "field" .Fields.EntityID }},
+            {{ template "field" .Fields.ChineseName }},
+            {{ template "field" .Fields.ChineseDescription }},
+            {{ template "field" .Fields.EnglishName }},
+            {{ template "field" .Fields.EnglishDescription }},
+            v_user_id
+        );
+
+        -- Return the newly inserted class at root level
+        {{- if .Top }}
+        RETURN QUERY
+        SELECT * FROM dbo.classes WHERE id = v_parent_class_id;
+        {{- end }}
+
+        {{- if .Permissions }}
+        -- Insert permissions
+        INSERT INTO dbo.permissions (class_id, role_type, role_id, permission_bits)
+        VALUES 
+        {{- range $index, $perm := .Permissions -}}
+            {{ if $index }},{{ end }}
+            (v_parent_class_id, '{{ $perm.RoleType }}', '{{ $perm.RoleID }}', {{ $perm.PermissionBits }})
+        {{- end }};
+        {{- end }}
+
+        {{- if .Children }}
+        -- Process children
+        {{- range .Children }}
+        {{ template "insertNode" . }}
+        {{- end }}
+        {{- end }}
+    END;
+{{- end }}
+
+{{ define "field" -}}
+  {{- if . -}}
+    {{- if .ParamName }}{{ .ParamName }}
+    {{- else if .Value }}'{{ .Value }}'
+    {{- else }}NULL{{ end -}}
+  {{- else -}}
+    NULL
+  {{- end -}}
+{{- end -}}
