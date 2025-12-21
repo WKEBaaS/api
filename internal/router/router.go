@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"baas-api/internal/classfunc"
 	"baas-api/internal/config"
 	"baas-api/internal/project"
 	"baas-api/internal/usersdb"
@@ -18,26 +19,29 @@ import (
 )
 
 type BaaSRouter struct {
-	config            *config.Config     `do:""`
-	router            *chi.Mux           `do:""`
-	v1API             *huma.Group        `do:"huma.api.v1"`
-	projectController project.Controller `do:""`
-	usersdbController usersdb.Controller `do:""`
+	config              *config.Config       `do:""`
+	router              *chi.Mux             `do:""`
+	v1API               *huma.Group          `do:"huma.api.v1"`
+	projectController   project.Controller   `do:""`
+	usersdbController   usersdb.Controller   `do:""`
+	classfuncController classfunc.Controller `do:""`
 }
 
 func NewBaaSRouter(i do.Injector) (*BaaSRouter, error) {
 	return &BaaSRouter{
-		config:            do.MustInvoke[*config.Config](i),
-		router:            do.MustInvoke[*chi.Mux](i),
-		v1API:             do.MustInvokeNamed[*huma.Group](i, "huma.api.v1"),
-		projectController: do.MustInvokeAs[project.Controller](i),
-		usersdbController: do.MustInvokeAs[usersdb.Controller](i),
+		config:              do.MustInvoke[*config.Config](i),
+		router:              do.MustInvoke[*chi.Mux](i),
+		v1API:               do.MustInvokeNamed[*huma.Group](i, "huma.api.v1"),
+		projectController:   do.MustInvokeAs[project.Controller](i),
+		usersdbController:   do.MustInvokeAs[usersdb.Controller](i),
+		classfuncController: do.MustInvokeAs[classfunc.Controller](i),
 	}, nil
 }
 
 func (r *BaaSRouter) RegisterControllers() {
 	huma.AutoRegister(r.v1API, r.projectController)
 	huma.AutoRegister(r.v1API, r.usersdbController)
+	huma.AutoRegister(r.v1API, r.classfuncController)
 }
 
 func (r *BaaSRouter) Start() {

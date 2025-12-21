@@ -10,7 +10,7 @@ import (
 
 	"baas-api/internal/kubeproject"
 	"baas-api/internal/models"
-	"baas-api/internal/project"
+	"baas-api/internal/pgrest"
 
 	"github.com/patrickmn/go-cache"
 	"github.com/samber/do/v2"
@@ -21,7 +21,7 @@ import (
 
 type Service interface {
 	// GetDB by baas-project ref
-	GetDB(ctx context.Context, ref, userID, role string) (*gorm.DB, error)
+	GetDB(ctx context.Context, jwt, ref, role string) (*gorm.DB, error)
 	GetRootClasses(ctx context.Context, db *gorm.DB) ([]models.Class, error)
 	GetClassesChild(ctx context.Context, db *gorm.DB, classIDs []string) ([]models.ClassWithPCID, error)
 	GetChildClasses(ctx context.Context, db *gorm.DB, pcid string) ([]models.Class, error)
@@ -32,29 +32,26 @@ type Service interface {
 
 type service struct {
 	// config *config.Config
-	kube    kubeproject.Service
-	project project.Repository
-	cache   *cache.Cache
+	kube   kubeproject.Service
+	pgrest pgrest.Service
+	cache  *cache.Cache
 }
 
 var _ Service = (*service)(nil)
 
 func NewService(i do.Injector) (*service, error) {
 	return &service{
-		kube:    do.MustInvokeAs[kubeproject.Service](i),
-		project: do.MustInvokeAs[project.Repository](i),
-		cache:   do.MustInvoke[*cache.Cache](i),
+		kube:   do.MustInvokeAs[kubeproject.Service](i),
+		pgrest: do.MustInvokeAs[pgrest.Service](i),
+		cache:  do.MustInvoke[*cache.Cache](i),
 	}, nil
 }
 
-func (s *service) GetDB(ctx context.Context, ref, userID, role string) (*gorm.DB, error) {
+func (s *service) GetDB(ctx context.Context, jwt, ref, role string) (*gorm.DB, error) {
 	// 1. 驗證權限
-	isOwner, err := s.project.IsOwner(ctx, ref, userID)
+	err := s.pgrest.CheckProjectPermission(ctx, jwt, ref)
 	if err != nil {
 		return nil, err
-	}
-	if !isOwner && role == "owner" {
-		return nil, errors.New("only project owner can use owner role to connect database")
 	}
 
 	// 2. 生成緩存鍵

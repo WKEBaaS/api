@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"baas-api/internal/config"
+	"baas-api/internal/dto"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/samber/do/v2"
@@ -23,11 +24,18 @@ type Service interface {
 	UpdateProject(ctx context.Context, jwt string, payload UpdateProjectPayload) (*UpdateProjectOutput, error)
 	// CreateOrUpdateAuthProvider
 	CreateOrUpdateAuthProvider(ctx context.Context, jwt string, payload CreateOrUpdateAuthProviderPayload) error
+	// CheckProjectPermission checks if the user has permission to access the project.
+	CheckProjectPermission(ctx context.Context, jwt string, projectID string) error
+	CheckProjectPermissionByRef(ctx context.Context, jwt string, projectRef string) error
+
+	CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error
 }
 
 type service struct {
 	config *config.Config
 }
+
+var _ Service = (*service)(nil)
 
 func NewService(i do.Injector) (*service, error) {
 	return &service{

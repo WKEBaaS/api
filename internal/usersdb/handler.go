@@ -23,8 +23,8 @@ type Controller interface {
 }
 
 type controller struct {
-	authMiddleware middlewares.AuthMiddleware `do:""`
-	usersdb        Service                    `do:""`
+	authMiddleware middlewares.AuthMiddleware
+	usersdb        Service
 }
 
 var _ Controller = (*controller)(nil)

@@ -115,7 +115,7 @@ func (p PermissionRoleType) Value() (driver.Value, error) {
 }
 
 type Permission struct {
-	ClassID        string             `gorm:"type:varchar(21);not null;uniqueIndex:uq_dbo_permissions,priority:1" json:"class_id"`
+	ClassID        string             `gorm:"type:varchar(21);not null;uniqueIndex:uq_dbo_permissions,priority:1" json:"class_id,omitempty"`
 	RoleType       PermissionRoleType `gorm:"type:dbo.permission_role_type;not null;uniqueIndex:uq_dbo_permissions,priority:2" json:"role_type"`
 	RoleID         string             `gorm:"type:uuid;not null;uniqueIndex:uq_dbo_permissions,priority:3" json:"role_id"`
 	PermissionBits int16              `gorm:"type:smallint;default:1;not null" json:"permission_bits"`
