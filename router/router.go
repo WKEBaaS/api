@@ -21,6 +21,7 @@ type BaaSRouter struct {
 	router            *chi.Mux                               `do:""`
 	v1API             *huma.Group                            `do:"huma.api.v1"`
 	projectController controllers.ProjectControllerInterface `do:""`
+	usersdbController controllers.UsersDBControllerInterface `do:""`
 }
 
 func NewBaaSRouter(i do.Injector) (*BaaSRouter, error) {
@@ -29,11 +30,13 @@ func NewBaaSRouter(i do.Injector) (*BaaSRouter, error) {
 		router:            do.MustInvoke[*chi.Mux](i),
 		v1API:             do.MustInvokeNamed[*huma.Group](i, "huma.api.v1"),
 		projectController: do.MustInvoke[controllers.ProjectControllerInterface](i),
+		usersdbController: do.MustInvoke[controllers.UsersDBControllerInterface](i),
 	}, nil
 }
 
 func (r *BaaSRouter) RegisterControllers() {
 	huma.AutoRegister(r.v1API, r.projectController)
+	huma.AutoRegister(r.v1API, r.usersdbController)
 }
 
 func (r *BaaSRouter) Start() {

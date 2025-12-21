@@ -4,14 +4,16 @@
 package middlewares
 
 import (
-	"baas-api/config"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"baas-api/config"
+
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/samber/do/v2"
 )
 
 type Session struct {
@@ -41,7 +43,12 @@ type GetSessionResponse struct {
 	User    User    `json:"user"`
 }
 
-func NewAuthMiddleware(api huma.API, config *config.Config) func(huma.Context, func(huma.Context)) {
+type AuthMiddleware func(huma.Context, func(huma.Context))
+
+func NewAuthMiddleware(i do.Injector) (AuthMiddleware, error) {
+	api := do.MustInvoke[huma.API](i)
+	config := do.MustInvoke[*config.Config](i)
+
 	return func(ctx huma.Context, next func(huma.Context)) {
 		getSessionURL := config.Auth.URL.JoinPath("/get-session")
 		req, err := http.NewRequest(http.MethodGet, getSessionURL.String(), nil)
@@ -89,5 +96,5 @@ func NewAuthMiddleware(api huma.API, config *config.Config) func(huma.Context, f
 		ctx = huma.WithValue(ctx, "user", sessionResp.User)
 		ctx = huma.WithValue(ctx, "jwt", jwt)
 		next(ctx)
-	}
+	}, nil
 }
