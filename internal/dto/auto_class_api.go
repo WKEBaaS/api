@@ -7,7 +7,7 @@ type CreateClassFunctionInput struct {
 		ProjectID     string   `json:"project_id"`
 		ProjectRef    string   `json:"project_ref"`
 		Name          string   `json:"name"`
-		Version       string   `json:"version"`
+		Version       int16    `json:"version"`
 		Description   string   `json:"description"`
 		Authenticated bool     `json:"authenticated"`
 		RootNode      RootNode `json:"root_node"`

@@ -46,11 +46,11 @@ func (c *controller) RegisterGetRootClasses(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetUsersFirstLevelClassesOutput, error) {
-		session, err := utils.GetSessionFromContext(ctx)
+		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
-		db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+		db, err := c.usersdb.GetDB(ctx, jwt, in.Ref, "superuser")
 		if err != nil {
 			return nil, err
 		}
@@ -76,12 +76,12 @@ func (c *controller) RegisterGetClassChildren(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.GetUsersChildClassesInput) (*dto.GetUsersChildClassesOutput, error) {
-		session, err := utils.GetSessionFromContext(ctx)
+		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+		db, err := c.usersdb.GetDB(ctx, jwt, in.Ref, "superuser")
 		if err != nil {
 			return nil, err
 		}
@@ -107,12 +107,12 @@ func (c *controller) RegisterGetClassByID(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.GetUsersClassByIDInput) (*dto.GetUsersClassByIDOutput, error) {
-		session, err := utils.GetSessionFromContext(ctx)
+		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
+		db, err := c.usersdb.GetDB(ctx, jwt, in.Ref, "superuser")
 		if err != nil {
 			return nil, err
 		}
