@@ -13,13 +13,13 @@ import (
 )
 
 type Controller interface {
+	RegisterGetRootClass(api huma.API)
 	RegisterGetRootClasses(api huma.API)
 	RegisterGetClassChildren(api huma.API)
 	RegisterGetClassByID(api huma.API)
 	RegisterGetClassPermissions(api huma.API)
 	RegisterGetClassesChildBatched(api huma.API)
 	RegisterUpdateUsersClassPermissions(api huma.API)
-	// RegisterCreateClassAPI(api huma.API)
 }
 
 type controller struct {
@@ -29,11 +29,39 @@ type controller struct {
 
 var _ Controller = (*controller)(nil)
 
-func NewController(i do.Injector) (Controller, error) {
+func NewController(i do.Injector) (*controller, error) {
 	return &controller{
 		authMiddleware: do.MustInvoke[middlewares.AuthMiddleware](i),
 		usersdb:        do.MustInvokeAs[Service](i),
 	}, nil
+}
+
+func (c *controller) RegisterGetRootClass(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-users-root-class",
+		Method:      "GET",
+		Path:        "/project/root-class",
+		Summary:     "Get User's Root Class",
+		Description: "Retrieve the root class for the authenticated user in the specified project.",
+		Tags:        []string{"UsersDB"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
+	}, func(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetUsersRootClassOutput, error) {
+		// 1. 取得 JWT
+		jwt, err := utils.GetJWTFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// 2. 直接呼叫 Service，不再需要先 GetDB，role 也不用傳 (Service 內定為 superuser)
+		class, err := c.usersdb.GetRootClass(ctx, jwt, in.Ref)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &dto.GetUsersRootClassOutput{}
+		out.Body.Class = *class
+		return out, nil
+	})
 }
 
 func (c *controller) RegisterGetRootClasses(api huma.API) {
@@ -45,22 +73,18 @@ func (c *controller) RegisterGetRootClasses(api huma.API) {
 		Description: "Retrieve the root classes for the authenticated user in the specified project.",
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
-	}, func(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetUsersFirstLevelClassesOutput, error) {
+	}, func(ctx context.Context, in *dto.GetProjectByRefInput) (*dto.GetUsersRootClassesOutput, error) {
 		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
-		db, err := c.usersdb.GetDB(ctx, jwt, in.Ref, "superuser")
+
+		classes, err := c.usersdb.GetRootClasses(ctx, jwt, in.Ref)
 		if err != nil {
 			return nil, err
 		}
 
-		classes, err := c.usersdb.GetRootClasses(ctx, db)
-		if err != nil {
-			return nil, err
-		}
-
-		out := &dto.GetUsersFirstLevelClassesOutput{}
+		out := &dto.GetUsersRootClassesOutput{}
 		out.Body.Classes = classes
 		return out, nil
 	})
@@ -81,11 +105,7 @@ func (c *controller) RegisterGetClassChildren(api huma.API) {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, jwt, in.Ref, "superuser")
-		if err != nil {
-			return nil, err
-		}
-		classes, err := c.usersdb.GetChildClasses(ctx, db, in.PCID)
+		classes, err := c.usersdb.GetChildClasses(ctx, jwt, in.Ref, in.PCID)
 		if err != nil {
 			return nil, err
 		}
@@ -112,12 +132,7 @@ func (c *controller) RegisterGetClassByID(api huma.API) {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, jwt, in.Ref, "superuser")
-		if err != nil {
-			return nil, err
-		}
-
-		class, err := c.usersdb.GetClassByID(ctx, db, in.ClassID)
+		class, err := c.usersdb.GetClassByID(ctx, jwt, in.Ref, in.ClassID)
 		if err != nil {
 			return nil, err
 		}
@@ -139,17 +154,13 @@ func (c *controller) RegisterGetClassPermissions(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.GetUsersClassPermissionsInput) (*dto.GetUsersClassPermissionsOutput, error) {
-		session, err := utils.GetSessionFromContext(ctx)
+		// 改用 GetJWTFromContext，因為 Service 層需要 JWT 字串來連線 DB
+		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
-		if err != nil {
-			return nil, err
-		}
-
-		permissions, err := c.usersdb.GetClassPermissions(ctx, db, in.ClassID)
+		permissions, err := c.usersdb.GetClassPermissions(ctx, jwt, in.Ref, in.ClassID)
 		if err != nil {
 			return nil, err
 		}
@@ -171,17 +182,13 @@ func (c *controller) RegisterGetClassesChildBatched(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.GetUsersClassesChildInput) (*dto.GetUsersClassesChildOutput, error) {
-		session, err := utils.GetSessionFromContext(ctx)
+		// 改用 GetJWTFromContext
+		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, in.Ref, session.UserID, "superuser")
-		if err != nil {
-			return nil, err
-		}
-
-		classes, err := c.usersdb.GetClassesChild(ctx, db, in.ClassIDs)
+		classes, err := c.usersdb.GetClassesChild(ctx, jwt, in.Ref, in.ClassIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -203,17 +210,14 @@ func (c *controller) RegisterUpdateUsersClassPermissions(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.UpdateUsersClassPermissionsInput) (*struct{}, error) {
-		session, err := utils.GetSessionFromContext(ctx)
+		// 改用 GetJWTFromContext
+		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		db, err := c.usersdb.GetDB(ctx, in.Body.Ref, session.UserID, "superuser")
-		if err != nil {
-			return nil, err
-		}
-
-		err = c.usersdb.UpdateClassPermissions(ctx, db, in.Body.ClassID, in.Body.Permissions)
+		// 參數從 Body 中獲取
+		err = c.usersdb.UpdateClassPermissions(ctx, jwt, in.Body.Ref, in.Body.ClassID, in.Body.Permissions)
 		if err != nil {
 			return nil, err
 		}

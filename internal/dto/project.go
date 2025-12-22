@@ -104,7 +104,13 @@ type GetProjectSettingsOutput struct {
 	}
 }
 
-type GetUsersFirstLevelClassesOutput struct {
+type GetUsersRootClassOutput struct {
+	Body struct {
+		Class models.Class `json:"class" doc:"Root class details"`
+	}
+}
+
+type GetUsersRootClassesOutput struct {
 	Body struct {
 		Classes []models.Class `json:"classes" doc:"List of first-level classes"`
 	}
