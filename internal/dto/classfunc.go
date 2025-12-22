@@ -11,7 +11,7 @@ type CreateClassFunctionInput struct {
 		Description   string   `json:"description"`
 		Authenticated bool     `json:"authenticated"`
 		RootNode      RootNode `json:"root_node"`
-		Nodes         Node     `json:"nodes"`
+		Node          Node     `json:"node"`
 	}
 }
 

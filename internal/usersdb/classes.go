@@ -23,7 +23,6 @@ func (s *service) GetRootClass(ctx context.Context, jwt, ref string) (*models.Cl
 
 	err = db.WithContext(ctx).
 		Model(&models.Class{}).
-		Select("dbo.classes.id, dbo.classes.chinese_name").
 		Where("name_path = '/'").
 		First(&class).Error
 	if err != nil {
@@ -96,7 +95,6 @@ func (s *service) GetClassesChild(ctx context.Context, jwt, ref string, classIDs
 	var classes []models.ClassWithPCID
 
 	err = db.WithContext(ctx).
-		Debug().
 		Table("dbo.classes AS c").
 		Select("c.id, c.chinese_name, i.pcid").
 		Joins("JOIN dbo.inheritances AS i ON i.ccid = c.id").

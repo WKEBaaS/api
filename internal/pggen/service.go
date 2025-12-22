@@ -114,12 +114,12 @@ func NewCreateClassFunctionData(in *dto.CreateClassFunctionInput) (*CreateClassF
 	f.Authenticated = in.Body.Authenticated
 
 	params := []FunctionParam{}
-	f.collectNodeParams(in.Body.Nodes, &params)
+	f.collectNodeParams(in.Body.Node, &params)
 	f.Params = params
 
 	// Nodes
 	f.RootNode = in.Body.RootNode
-	f.Nodes = in.Body.Nodes
+	f.Nodes = in.Body.Node
 	f.Nodes.Top = true
 
 	return f, nil

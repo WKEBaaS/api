@@ -208,7 +208,7 @@ func (s *service) CreateClassFunction(ctx context.Context, jwt string, in *dto.C
 		"p_description":   in.Body.Description,
 		"p_authenticated": in.Body.Authenticated,
 		"p_root_node":     in.Body.RootNode,
-		"p_nodes":         in.Body.Nodes,
+		"p_nodes":         in.Body.Node,
 	})
 
 	if pgrst.ClientError != nil {
