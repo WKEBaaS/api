@@ -3,7 +3,6 @@ package pggen
 import (
 	"bytes"
 	"context"
-	"log/slog"
 	"os"
 	"reflect"
 	"text/template"
@@ -69,8 +68,6 @@ func NewService(i do.Injector) (*service, error) {
 }
 
 func (s *service) GenerateCreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error {
-	// 1. Get DB: Get user's db will check permission as well
-	slog.Info("Generating create class function", "projectRef", in.Body.ProjectRef, "functionName", in.Body.Name)
 	db, err := s.usersdb.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
 	if err != nil {
 		return err
