@@ -6,6 +6,7 @@ package usersdb
 import (
 	"context"
 
+	"baas-api/internal/dto"
 	"baas-api/internal/models"
 
 	"gorm.io/gorm"
@@ -188,4 +189,49 @@ func (s *service) UpdateClassPermissions(ctx context.Context, jwt, ref string, c
 
 		return nil
 	})
+}
+
+func (s *service) CreateClass(ctx context.Context, jwt string, in *dto.CreateClassInput) (*models.Class, error) {
+	db, err := s.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
+	if err != nil {
+		return nil, err
+	}
+
+	class := &models.Class{}
+
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Create the class
+		query := `SELECT * FROM dbo.fn_insert_class(?, ?, ?, ?, ?, ?, ?)`
+		tx.Raw(query,
+			in.Body.ParentClassID,
+			in.Body.EntityID,
+			in.Body.ChineseName,
+			in.Body.ChineseDesc,
+			in.Body.EnglishName,
+			in.Body.EnglishDesc,
+			nil).
+			Scan(class)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return class, nil
+}
+
+func (s *service) DeleteClass(ctx context.Context, jwt string, in *dto.DeleteClassInput) error {
+	db, err := s.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
+	if err != nil {
+		return err
+	}
+
+	// fn_delete_class(p_class_id character varying, p_recursive boolean DEFAULT false)
+	query := `SELECT dbo.fn_delete_class(?, ?)`
+	err = db.WithContext(ctx).
+		Exec(query, in.Body.ClassID, in.Body.Recursive).
+		Error
+
+	return err
 }

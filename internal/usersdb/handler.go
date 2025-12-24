@@ -20,6 +20,8 @@ type Controller interface {
 	RegisterGetClassPermissions(api huma.API)
 	RegisterGetClassesChildBatched(api huma.API)
 	RegisterUpdateUsersClassPermissions(api huma.API)
+	RegisterCreateClass(api huma.API)
+	RegisterDeleteUsersClass(api huma.API)
 }
 
 type controller struct {
@@ -210,7 +212,6 @@ func (c *controller) RegisterUpdateUsersClassPermissions(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.UpdateUsersClassPermissionsInput) (*struct{}, error) {
-		// 改用 GetJWTFromContext
 		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
@@ -218,6 +219,56 @@ func (c *controller) RegisterUpdateUsersClassPermissions(api huma.API) {
 
 		// 參數從 Body 中獲取
 		err = c.usersdb.UpdateClassPermissions(ctx, jwt, in.Body.Ref, in.Body.ClassID, in.Body.Permissions)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	})
+}
+
+func (c *controller) RegisterCreateClass(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "create-users-class",
+		Method:      "POST",
+		Path:        "/project/class",
+		Summary:     "Create User's Class",
+		Description: "Create a new class under a specified parent class ID (PCID) for the authenticated user in the specified project.",
+		Tags:        []string{"UsersDB"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
+	}, func(ctx context.Context, in *dto.CreateClassInput) (*dto.CreateClassOutput, error) {
+		jwt, err := utils.GetJWTFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		class, err := c.usersdb.CreateClass(ctx, jwt, in)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &dto.CreateClassOutput{}
+		out.Body.Class = *class
+		return out, nil
+	})
+}
+
+func (c *controller) RegisterDeleteUsersClass(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "delete-users-class",
+		Method:      "DELETE",
+		Path:        "/project/class",
+		Summary:     "Delete User's Class",
+		Description: "Delete a class by its ID for the authenticated user in the specified project.",
+		Tags:        []string{"UsersDB"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
+	}, func(ctx context.Context, in *dto.DeleteClassInput) (*struct{}, error) {
+		jwt, err := utils.GetJWTFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		err = c.usersdb.DeleteClass(ctx, jwt, in)
 		if err != nil {
 			return nil, err
 		}

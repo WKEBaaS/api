@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"baas-api/internal/dto"
 	"baas-api/internal/kubeproject"
 	"baas-api/internal/models"
 	"baas-api/internal/pgrest"
@@ -29,6 +30,8 @@ type Service interface {
 	GetClassByID(ctx context.Context, jwt, ref string, classID string) (*models.Class, error)
 	GetClassPermissions(ctx context.Context, jwt, ref string, classID string) ([]models.PermissionWithRoleName, error)
 	UpdateClassPermissions(ctx context.Context, jwt, ref string, classID string, permissions []models.Permission) error
+	CreateClass(ctx context.Context, jwt string, in *dto.CreateClassInput) (*models.Class, error)
+	DeleteClass(ctx context.Context, jwt string, in *dto.DeleteClassInput) error
 }
 
 type service struct {

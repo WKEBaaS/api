@@ -131,8 +131,8 @@ func (Permission) TableName() string {
 }
 
 type Inheritance struct {
-	PCID string `gorm:"primaryKey;type:varchar(21);not null" json:"pcid"`
-	CCID string `gorm:"primaryKey;type:varchar(21);not null" json:"ccid"`
+	PCID string `gorm:"column:pcid;primaryKey;type:varchar(21);not null" json:"pcid"`
+	CCID string `gorm:"column:ccid;primaryKey;type:varchar(21);not null" json:"ccid"`
 
 	// relationships
 	ParentClass Class `gorm:"foreignKey:PCID;constraint:OnDelete:CASCADE" json:"parent_class"`
