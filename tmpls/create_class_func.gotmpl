@@ -11,6 +11,7 @@ AS $$
 DECLARE
     v_user_id uuid := auth.jwt() ->> 'sub';
     v_parent_class_id VARCHAR(21) := '{{ .RootNode.ClassID }}';
+    v_created_class dbo.classes%ROWTYPE;
 BEGIN
 {{- if .Authenticated }}
     -- Authentication check
@@ -58,10 +59,15 @@ $$;
             v_user_id
         );
 
-        -- Return the newly inserted class at root level
         {{- if .Top }}
-        RETURN QUERY
-        SELECT * FROM dbo.classes WHERE id = v_parent_class_id;
+        -- Return the newly inserted class at root level
+        SELECT *
+        INTO v_created_class
+        FROM dbo.classes WHERE id = v_parent_class_id;
+        
+        -- Insert full permissions to creator
+        INSERT INTO dbo.permissions (class_id, role_type, role_id, permission_bits)
+        VALUES (v_created_class.id, 'USER', v_user_id, 127);
         {{- end }}
 
         {{- if .Permissions }}
