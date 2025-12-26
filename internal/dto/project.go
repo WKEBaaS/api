@@ -96,6 +96,7 @@ type ProjectAuthProviderInfo struct {
 type GetProjectSettingsOutput struct {
 	Body struct {
 		ID             string              `json:"id" doc:"Project ID"`
+		ProjectID      string              `json:"projectId" doc:"Project unique identifier"`
 		TrustedOrigins []string            `json:"trustedOrigins" doc:"List of trusted origins for CORS"`
 		ProxyURL       *string             `json:"proxyURL,omitempty" doc:"Proxy URL if set"`
 		Auth           ProjectAuthSettings `json:"auth" doc:"Authentication settings for the project"`

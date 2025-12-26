@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -48,6 +49,10 @@ type S3Config struct {
 	Region          string
 }
 
+type LoggingConfig struct {
+	Level string
+}
+
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
@@ -55,6 +60,7 @@ type Config struct {
 	PgREST   PgRESTConfig
 	Kube     KubeConfig
 	S3       S3Config
+	Logging  LoggingConfig
 }
 
 func NewConfig(i do.Injector) (*Config, error) {
@@ -78,6 +84,19 @@ func NewConfig(i do.Injector) (*Config, error) {
 	))
 	if err != nil {
 		return nil, err
+	}
+
+	switch c.Logging.Level {
+	case "DEBUG":
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	case "INFO":
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+	case "WARN":
+		slog.SetLogLoggerLevel(slog.LevelWarn)
+	case "ERROR":
+		slog.SetLogLoggerLevel(slog.LevelError)
+	default:
+		slog.SetLogLoggerLevel(slog.LevelInfo)
 	}
 
 	return c, nil

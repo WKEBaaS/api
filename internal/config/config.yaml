@@ -48,3 +48,7 @@ kube:
     namespace: "default"
     # The name of the Kubernetes secret containing TLS certificates.
     tlsSecretName: "app-tls-secret"
+
+logging:
+  # Log level for the application (e.g., debug, info, warn, error).
+  level: "info"

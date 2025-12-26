@@ -355,6 +355,8 @@ func (s *service) PatchProjectSettings(ctx context.Context, jwt string, in *dto.
 		return err
 	}
 
+	slog.Debug("Patch Project", "input", in.Body)
+
 	needPatchDeployment := false
 	opt := &kubeproject.APIDeploymentOption{}
 	if in.Body.TrustedOrigins != nil {
@@ -487,7 +489,8 @@ func (s *service) GetProjectSettings(ctx context.Context, in *dto.GetProjectSett
 	}
 
 	out := &dto.GetProjectSettingsOutput{}
-	out.Body.ID = project.ID
+	out.Body.ID = authSettings.ID
+	out.Body.ProjectID = authSettings.ProjectID
 	out.Body.TrustedOrigins = authSettings.TrustedOrigins
 	out.Body.ProxyURL = authSettings.ProxyURL
 	out.Body.CreatedAt = project.CreatedAt.Format(time.RFC3339)

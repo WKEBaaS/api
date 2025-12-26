@@ -218,9 +218,9 @@ func (c *controller) RegisterDeleteProjectByRef(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "delete-project-by-ref",
 		Method:      "DELETE",
-		Path:        "/project/by-ref",
-		Summary:     "Delete Project by Reference",
-		Description: "Delete a project by its reference. The reference is a 20-character string.",
+		Path:        "/project",
+		Summary:     "Delete Project by ID",
+		Description: "Delete a project by its ID.",
 		Tags:        []string{"Project"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.DeleteProjectByIDInput) (*dto.DeleteProjectByIDOutput, error) {
