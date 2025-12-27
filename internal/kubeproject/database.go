@@ -4,25 +4,25 @@
 package kubeproject
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"log/slog"
-	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (s *service) CreateDatabase(ctx context.Context, ref string) error {
-	pgDatabaseYAML, err := os.Open("kube-files/project-cnpg-database.yaml")
-	if err != nil {
-		slog.Error("Failed to open Postgres database YAML file", "error", err)
-		return ErrFailedToOpenPostgresDatabaseYAML
-	}
-	defer pgDatabaseYAML.Close()
+//go:embed kube-files/project-cnpg-database.yaml
+var pgDatabaseYAMLBuf []byte
 
+func (s *service) CreateDatabase(ctx context.Context, ref string) error {
 	pgDatabaseUnstructured := &unstructured.Unstructured{}
-	decoder := yaml.NewYAMLOrJSONDecoder(pgDatabaseYAML, 1024)
+
+	reader := bytes.NewReader(pgDatabaseYAMLBuf)
+	decoder := yaml.NewYAMLOrJSONDecoder(reader, 1024)
+
 	if err := decoder.Decode(pgDatabaseUnstructured); err != nil {
 		slog.Error("Failed to decode Postgres database YAML", "error", err)
 		return ErrFailedToDecodePostgresDatabaseYAML
@@ -39,7 +39,7 @@ func (s *service) CreateDatabase(ctx context.Context, ref string) error {
 	}
 
 	// 使用 dynamicClient 創建資源
-	_, err = s.dynamicClient.Resource(databaseGVR).
+	_, err := s.dynamicClient.Resource(databaseGVR).
 		Namespace(s.namespace).
 		Create(ctx, pgDatabaseUnstructured, metav1.CreateOptions{})
 	if err != nil {

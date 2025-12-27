@@ -3,7 +3,7 @@ package pggen
 import (
 	"bytes"
 	"context"
-	"os"
+	_ "embed"
 	"reflect"
 	"text/template"
 
@@ -49,13 +49,11 @@ type service struct {
 
 var _ Service = (*service)(nil)
 
-func NewService(i do.Injector) (*service, error) {
-	createClassFuncTmplBuf, err := os.ReadFile("./tmpls/create_class_func.gotmpl")
-	if err != nil {
-		return nil, err
-	}
+//go:embed create_class_func.gotmpl
+var createClassFuncTmplStr string
 
-	createClassFuncTmpl, err := template.New("create_class_function").Parse(string(createClassFuncTmplBuf))
+func NewService(i do.Injector) (*service, error) {
+	createClassFuncTmpl, err := template.New("create_class_function").Parse(createClassFuncTmplStr)
 	if err != nil {
 		return nil, err
 	}

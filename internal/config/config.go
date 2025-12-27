@@ -4,7 +4,6 @@ package config
 import (
 	"bytes"
 	_ "embed"
-	"log"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -93,8 +92,6 @@ func NewConfig(i do.Injector) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("Loaded configuration: %+v\n", c)
 
 	switch c.Logging.Level {
 	case "DEBUG":

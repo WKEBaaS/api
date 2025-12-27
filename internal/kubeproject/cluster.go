@@ -6,9 +6,9 @@ package kubeproject
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"errors"
 	"log/slog"
-	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -18,18 +18,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (s *service) CreateCluster(ctx context.Context, ref string, storageSize string) error {
-	clusterYAML, err := os.ReadFile("kube-files/project-cnpg-cluster.yaml")
-	if err != nil {
-		slog.Error("Failed to open Postgres cluster YAML file", "error", err)
-		return ErrFailedToOpenPostgresClusterYAML
-	}
+//go:embed kube-files/project-cnpg-cluster.yaml
+var clusterYAML string
 
-	clusterYAMLString := string(clusterYAML)
+func (s *service) CreateCluster(ctx context.Context, ref string, storageSize string) error {
 	clusterData := map[string]any{
 		"RoleAuthenticatorSecretName": s.GetDatabaseRoleSecretName(ref, RoleAuthenticator),
 	}
-	clusterTmpl, err := template.New("yaml").Parse(clusterYAMLString)
+	clusterTmpl, err := template.New("yaml").Parse(clusterYAML)
 	if err != nil {
 		slog.Error("Failed to parse Postgres cluster YAML template", "error", err)
 		return errors.New("failed to parse Postgres cluster YAML template")

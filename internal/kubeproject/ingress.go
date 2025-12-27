@@ -5,9 +5,9 @@ package kubeproject
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"log/slog"
-	"os"
 	"strings"
 	"text/template"
 
@@ -16,21 +16,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func (s *service) CreateIngressRoute(ctx context.Context, ref string) error {
-	ingressYAML, err := os.ReadFile("kube-files/project-ingressroute.yaml")
-	if err != nil {
-		slog.Error("Failed to open IngressRoute YAML file", "error", err)
-		return errors.New("failed to open IngressRoute YAML file")
-	}
+//go:embed kube-files/project-ingressroute.yaml
+var ingressRouteYAMLStr string
 
-	ingressYAMLString := string(ingressYAML)
+//go:embed kube-files/project-ingressroutetcp.yaml
+var ingressRouteTCPYAMLStr string
+
+func (s *service) CreateIngressRoute(ctx context.Context, ref string) error {
 	ingressData := map[string]any{
 		"ProjectHost":     s.GetProjectHost(ref),
 		"AuthServiceName": s.GetAuthAPIServiceName(ref),
 		"RESTServiceName": s.GetRESTAPIServiceName(ref),
 		"TLSSecretName":   s.config.Kube.Project.TLSSecretName,
 	}
-	ingressTmpl, err := template.New("yaml").Parse(ingressYAMLString)
+	ingressTmpl, err := template.New("yaml").Parse(ingressRouteYAMLStr)
 	if err != nil {
 		slog.Error("Failed to parse IngressRoute YAML template", "error", err)
 		return errors.New("failed to parse IngressRoute YAML template")
@@ -80,19 +79,12 @@ func (s *service) DeleteIngressRoute(ctx context.Context, ref string) error {
 }
 
 func (s *service) CreateIngressRouteTCP(ctx context.Context, ref string) error {
-	ingressTCPYAML, err := os.ReadFile("kube-files/project-ingressroutetcp.yaml")
-	if err != nil {
-		slog.Error("Failed to open IngressRouteTCP YAML file", "error", err)
-		return ErrFailedToOpenIngressRouteTCPYAML
-	}
-
-	ingressTCPYAMLString := string(ingressTCPYAML)
 	ingressData := map[string]any{
 		"ProjectHost":          s.GetProjectHost(ref),
 		"ProjectDBServiceName": s.GetDatabaseRWServiceName(ref),
 		"TLSSecretName":        s.config.Kube.Project.TLSSecretName,
 	}
-	ingressTmpl, err := template.New("yaml").Parse(ingressTCPYAMLString)
+	ingressTmpl, err := template.New("yaml").Parse(ingressRouteTCPYAMLStr)
 	if err != nil {
 		slog.Error("Failed to parse IngressRouteTCP YAML template", "error", err)
 		return errors.New("failed to parse IngressRouteTCP YAML template")
