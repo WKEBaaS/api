@@ -28,7 +28,7 @@ func NewHumaAPI(i do.Injector) (huma.API, error) {
 	router := do.MustInvoke[*chi.Mux](i)
 
 	humaConfig := huma.DefaultConfig("WKE BaaS API", "0.2.0")
-	humaConfig.OpenAPIPath = "/api/docs/openapi"
+	humaConfig.OpenAPIPath = "/api/openapi/openapi"
 
 	api := humachi.New(router, humaConfig)
 	return api, nil
