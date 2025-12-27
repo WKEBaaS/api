@@ -2,6 +2,9 @@
 package config
 
 import (
+	"bytes"
+	_ "embed"
+	"log"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -63,17 +66,23 @@ type Config struct {
 	Logging  LoggingConfig
 }
 
+//go:embed config.yaml
+var defaultConfig []byte
+
 func NewConfig(i do.Injector) (*Config, error) {
 	c := &Config{}
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("internal/config")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := viper.ReadConfig(bytes.NewBuffer(defaultConfig)); err != nil {
+		return nil, err
+	}
+
+	if err := viper.MergeInConfig(); err != nil {
 		return c, err
 	}
 
@@ -85,6 +94,8 @@ func NewConfig(i do.Injector) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("Loaded configuration: %+v\n", c)
 
 	switch c.Logging.Level {
 	case "DEBUG":
