@@ -5,6 +5,8 @@ package kubeproject
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 
 	"baas-api/internal/config"
 
@@ -14,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
 type Service interface {
@@ -76,10 +79,31 @@ func NewService(i do.Injector) (*service, error) {
 	cfg := do.MustInvoke[*config.Config](i)
 	svc := &service{}
 
-	kc, err := clientcmd.BuildConfigFromFlags("", cfg.Kube.ConfigPath)
+	var kc *rest.Config
+	var err error
+
+	// 1. 優先嘗試讀取 In-Cluster Config (適用於 Pod 內部 / 生產環境)
+	kc, err = rest.InClusterConfig()
+	// 2. 如果 In-Cluster 失敗 (代表可能在 Local 開發環境)，則嘗試讀取 kubeconfig
 	if err != nil {
-		return nil, err
+		kubeConfigPath := cfg.Kube.ConfigPath
+
+		// 如果設定檔中沒有指定路徑，則使用預設路徑 (~/.kube/config)
+		if kubeConfigPath == "" {
+			if home := homedir.HomeDir(); home != "" {
+				kubeConfigPath = filepath.Join(home, ".kube", "config")
+			}
+		}
+
+		// 讀取 kubeconfig
+		kc, err = clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+		if err != nil {
+			// 如果兩種方式都失敗，才回傳錯誤
+			return nil, fmt.Errorf("無法初始化 K8s Config (InCluster 失敗且無法讀取 %s): %w", kubeConfigPath, err)
+		}
 	}
+
+	// 3. 初始化 Clients
 	clientset, err := kubernetes.NewForConfig(kc)
 	if err != nil {
 		return nil, err
@@ -88,8 +112,10 @@ func NewService(i do.Injector) (*service, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// 4. 設定 Service 屬性
 	svc.kubeConfig = kc
-	svc.kubeConfig.WarningHandler = rest.NoWarnings{}
+	svc.kubeConfig.WarningHandler = rest.NoWarnings{} // 忽略 API 警告
 	svc.clientset = clientset
 	svc.dynamicClient = dynamicClient
 	svc.config = cfg
