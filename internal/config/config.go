@@ -72,9 +72,7 @@ var defaultConfig []byte
 func NewConfig(i do.Injector) (*Config, error) {
 	c := &Config{}
 
-	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
@@ -82,9 +80,10 @@ func NewConfig(i do.Injector) (*Config, error) {
 		return nil, err
 	}
 
-	if err := viper.MergeInConfig(); err != nil {
-		return c, err
-	}
+	// 如果有外部檔案就讀取，沒有就用嵌入的 defaults
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	_ = viper.MergeInConfig()
 
 	err := viper.Unmarshal(&c, viper.DecodeHook(
 		mapstructure.ComposeDecodeHookFunc(
