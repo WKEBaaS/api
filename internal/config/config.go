@@ -21,6 +21,7 @@ type AppConfig struct {
 	TrustedOrigins []string
 	ExternalDomain string
 	ExternalSecure bool
+	OpenAPIPath    string
 }
 
 type DatabaseConfig struct {

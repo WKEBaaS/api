@@ -12,6 +12,10 @@ app:
   externalDomain: "app.example.com"
   # A boolean to indicate if the external domain uses HTTPS.
   externalSecure: true
+  # OpenAPIPath is the path to the OpenAPI spec without extension. If set
+  # to `/openapi` it will allow clients to get `/openapi.json` or
+  # `/openapi.yaml`, for example.
+  openAPIPath: "openapi"
 
 # Auth service configuration.
 auth:
