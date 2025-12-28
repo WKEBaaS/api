@@ -94,7 +94,7 @@ func NewConfig(i do.Injector) (*Config, error) {
 		return nil, err
 	}
 
-	switch c.Logging.Level {
+	switch strings.ToUpper(c.Logging.Level) {
 	case "DEBUG":
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	case "INFO":
@@ -106,6 +106,8 @@ func NewConfig(i do.Injector) (*Config, error) {
 	default:
 		slog.SetLogLoggerLevel(slog.LevelInfo)
 	}
+
+	slog.Debug("Configuration loaded", "config", c)
 
 	return c, nil
 }
