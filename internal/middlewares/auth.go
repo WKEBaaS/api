@@ -59,9 +59,13 @@ func NewAuthMiddleware(i do.Injector) (AuthMiddleware, error) {
 		}
 
 		cookies := huma.ReadCookies(ctx)
+		slog.Debug("AuthMiddleware cookies", "cookies", cookies)
 		for _, cookie := range cookies {
 			req.AddCookie(cookie)
 		}
+
+		req.Header.Set("X-Forwarded-Host", ctx.Host())
+		slog.Debug("AuthMiddleware request", "url", req.URL.String(), "headers", req.Header)
 
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
