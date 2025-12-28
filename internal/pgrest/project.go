@@ -90,11 +90,11 @@ func (s *service) DeleteProject(ctx context.Context, jwt string, id string) (*De
 }
 
 type UpdateProjectPayload struct {
-	ID             string   `json:"id"`
-	Name           *string  `json:"name"`
-	Description    *string  `json:"description"`
-	TrustedOrigins []string `json:"trusted_origins"`
-	ProxyURL       *string  `json:"proxy_url"`
+	ID             string   `json:"p_id"`
+	Name           *string  `json:"p_name"`
+	Description    *string  `json:"p_description"`
+	TrustedOrigins []string `json:"p_trusted_origins"`
+	ProxyURL       *string  `json:"p_proxy_url"`
 }
 
 type UpdateProjectOutput struct {
@@ -111,7 +111,7 @@ func (s *service) UpdateProject(ctx context.Context, jwt string, payload UpdateP
 		return nil, huma.Error500InternalServerError("Failed to call update_project RPC")
 	}
 
-	var out []UpdateProjectOutput
+	var out UpdateProjectOutput
 	if err := json.Unmarshal([]byte(resp), &out); err != nil {
 		if pgErr, _ := s.UnmarshalPgRestError([]byte(resp)); pgErr != nil {
 			slog.ErrorContext(ctx, "update_project error", "code", pgErr.Code, "message", pgErr.Message, "detail", pgErr.Detail, "hint", pgErr.Hint)
@@ -122,12 +122,7 @@ func (s *service) UpdateProject(ctx context.Context, jwt string, payload UpdateP
 		return nil, huma.Error500InternalServerError("Failed to unmarshal update_project response")
 	}
 
-	if len(out) == 0 {
-		slog.ErrorContext(ctx, "update_project returned no project")
-		return nil, huma.Error500InternalServerError("update_project returned no project")
-	}
-
-	return &out[0], nil
+	return &out, nil
 }
 
 type CreateOrUpdateAuthProviderPayload struct {
@@ -138,29 +133,13 @@ type CreateOrUpdateAuthProviderPayload struct {
 func (s *service) CreateOrUpdateAuthProvider(ctx context.Context, jwt string, payload CreateOrUpdateAuthProviderPayload) error {
 	pgrst := postgrest.NewClient(s.config.PgREST.URL.String(), "api", nil)
 	pgrst.SetAuthToken(jwt)
-	resp := pgrst.Rpc("create_or_update_auth_providers", "", map[string]CreateOrUpdateAuthProviderPayload{
+	pgrst.Rpc("create_or_update_auth_providers", "", map[string]CreateOrUpdateAuthProviderPayload{
 		"payload": payload,
 	})
 
 	if pgrst.ClientError != nil {
 		slog.ErrorContext(ctx, "Failed to call create_or_update_auth_providers RPC", "error", pgrst.ClientError)
 		return huma.Error500InternalServerError("Failed to call create_or_update_auth_providers RPC")
-	}
-
-	var out []map[string]any
-	if err := json.Unmarshal([]byte(resp), &out); err != nil {
-		if pgErr, _ := s.UnmarshalPgRestError([]byte(resp)); pgErr != nil {
-			slog.ErrorContext(ctx, "create_or_update_auth_providers error", "code", pgErr.Code, "message", pgErr.Message, "detail", pgErr.Detail, "hint", pgErr.Hint)
-			return huma.Error500InternalServerError("create_or_update_auth_providers error: " + pgErr.Message)
-		}
-
-		slog.ErrorContext(ctx, "Failed to unmarshal create_or_update_auth_providers response", "error", err)
-		return huma.Error500InternalServerError("Failed to unmarshal create_or_update_auth_providers response")
-	}
-
-	if len(out) == 0 {
-		slog.ErrorContext(ctx, "create_or_update_auth_providers returned no project")
-		return huma.Error500InternalServerError("create_or_update_auth_providers returned no project")
 	}
 
 	return nil
