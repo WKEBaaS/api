@@ -50,7 +50,7 @@ func NewAuthMiddleware(i do.Injector) (AuthMiddleware, error) {
 	config := do.MustInvoke[*config.Config](i)
 
 	return func(ctx huma.Context, next func(huma.Context)) {
-		getSessionURL := config.Auth.URL.JoinPath("/get-session")
+		getSessionURL := config.Auth.URL.JoinPath("/api/auth/get-session")
 		req, err := http.NewRequest(http.MethodGet, getSessionURL.String(), nil)
 		if err != nil {
 			slog.Error("Failed to create request for session", "error", err)
