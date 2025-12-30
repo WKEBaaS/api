@@ -7,7 +7,7 @@ import (
 type AuthProvider struct {
 	Enabled      bool    `json:"enabled" doc:"Enable this OAuth provider"`
 	ClientID     *string `json:"clientId,omitempty" doc:"OAuth Client ID"`
-	ClientSecret *string `json:"clientSecret,omitempty" doc:"OAuth Clien Secret"`
+	ClientSecret *string `json:"clientSecret,omitempty" doc:"OAuth Client Secret"`
 }
 
 type GetProjectByRefInput struct {

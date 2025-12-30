@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 
 	"baas-api/internal/dto"
@@ -134,9 +135,18 @@ func (s *service) PatchAuthAPIDeployment(ctx context.Context, ref string, opt *A
 	envVars := []corev1.EnvVar{}
 
 	if opt.ProxyURL != nil {
+		proxyURL, err := url.Parse(*opt.ProxyURL)
+		if err != nil {
+			slog.ErrorContext(ctx, "Invalid ProxyURL", "error", err)
+			return errors.New("invalid ProxyURL")
+		}
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "BETTER_AUTH_URL",
 			Value: *opt.ProxyURL,
+		})
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "COOKIE_DOMAIN",
+			Value: proxyURL.Hostname(),
 		})
 	}
 
