@@ -29,6 +29,7 @@ type Service interface {
 	CheckProjectPermissionByRef(ctx context.Context, jwt string, projectRef string) error
 
 	CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error
+	DeleteClassFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error
 }
 
 type service struct {

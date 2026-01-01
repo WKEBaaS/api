@@ -41,7 +41,7 @@ func (s *service) CreateRESTAPIDeployment(ctx context.Context, ref string, jwks 
 					Containers: []corev1.Container{
 						{
 							Name:  pgrstContainerName,
-							Image: "postgrest/postgrest:v13.0.4",
+							Image: "postgrest/postgrest:v14.2",
 							Ports: []corev1.ContainerPort{{
 								ContainerPort: 3000,
 							}},

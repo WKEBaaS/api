@@ -6,7 +6,6 @@ import (
 
 	"baas-api/internal/dto"
 	"baas-api/internal/middlewares"
-	"baas-api/internal/pggen"
 	"baas-api/internal/utils"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -19,7 +18,7 @@ type Controller interface {
 
 type controller struct {
 	authMiddleware middlewares.AuthMiddleware
-	pggen          pggen.Service
+	classfunc      Service
 }
 
 var _ Controller = (*controller)(nil)
@@ -27,7 +26,7 @@ var _ Controller = (*controller)(nil)
 func NewController(i do.Injector) (*controller, error) {
 	return &controller{
 		authMiddleware: do.MustInvoke[middlewares.AuthMiddleware](i),
-		pggen:          do.MustInvokeAs[pggen.Service](i),
+		classfunc:      do.MustInvokeAs[Service](i),
 	}, nil
 }
 
@@ -46,7 +45,29 @@ func (c *controller) RegisterCreateClassFunc(api huma.API) {
 			return nil, err
 		}
 
-		err = c.pggen.GenerateCreateClassFunction(ctx, jwt, in)
+		err = c.classfunc.CreateClassFunction(ctx, jwt, in)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "delete-create-class-function",
+		Method:      "DELETE",
+		Path:        "/project/create-classes-function",
+		Summary:     "Delete Create Class Function",
+		Description: "Delete the SQL function that creates a new class api in the users database.",
+		Tags:        []string{"UsersDB"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
+	}, func(ctx context.Context, in *dto.DeleteClassFunctionInput) (*struct{}, error) {
+		jwt, err := utils.GetJWTFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		err = c.classfunc.DeleteClassFunction(ctx, jwt, in)
 		if err != nil {
 			return nil, err
 		}

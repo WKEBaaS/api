@@ -180,7 +180,7 @@ func (s *service) CheckProjectPermissionByRef(ctx context.Context, jwt string, p
 func (s *service) CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error {
 	pgrst := postgrest.NewClient(s.config.PgREST.URL.String(), "api", nil)
 	pgrst.SetAuthToken(jwt)
-	resp := pgrst.Rpc("new_create_class_function", "", map[string]any{
+	resp := pgrst.Rpc("create_class_function", "", map[string]any{
 		"p_project_id":    in.Body.ProjectID,
 		"p_name":          in.Body.Name,
 		"p_version":       in.Body.Version,
@@ -198,6 +198,26 @@ func (s *service) CreateClassFunction(ctx context.Context, jwt string, in *dto.C
 
 		slog.ErrorContext(ctx, "Failed to call create_class_function RPC", "error", pgrst.ClientError)
 		return huma.Error500InternalServerError("Failed to call create_class_function RPC")
+	}
+	return nil
+}
+
+func (s *service) DeleteClassFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error {
+	pgrst := postgrest.NewClient(s.config.PgREST.URL.String(), "api", nil)
+	pgrst.SetAuthToken(jwt)
+	resp := pgrst.Rpc("delete_create_class_function", "", map[string]any{
+		"p_project_id": in.Body.ProjectID,
+		"p_name":       in.Body.Name,
+	})
+
+	if pgrst.ClientError != nil {
+		if pgErr, _ := s.UnmarshalPgRestError([]byte(resp)); pgErr != nil {
+			slog.ErrorContext(ctx, "delete_class_function error", "code", pgErr.Code, "message", pgErr.Message, "detail", pgErr.Detail, "hint", pgErr.Hint)
+			return pgErr.ToHumaError()
+		}
+
+		slog.ErrorContext(ctx, "Failed to call delete_class_function RPC", "error", pgrst.ClientError)
+		return huma.Error500InternalServerError("Failed to call delete_class_function RPC")
 	}
 	return nil
 }

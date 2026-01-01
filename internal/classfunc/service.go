@@ -1,4 +1,4 @@
-package pggen
+package classfunc
 
 import (
 	"bytes"
@@ -36,7 +36,8 @@ type FunctionVariable struct {
 }
 
 type Service interface {
-	GenerateCreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error
+	CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error
+	DeleteClassFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error
 }
 
 type service struct {
@@ -65,7 +66,7 @@ func NewService(i do.Injector) (*service, error) {
 	}, nil
 }
 
-func (s *service) GenerateCreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error {
+func (s *service) CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error {
 	db, err := s.usersdb.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
 	if err != nil {
 		return err
@@ -95,6 +96,27 @@ func (s *service) GenerateCreateClassFunction(ctx context.Context, jwt string, i
 		return err
 	}
 	if err := db.Exec(createFuncSQL).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *service) DeleteClassFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error {
+	db, err := s.usersdb.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
+	if err != nil {
+		return err
+	}
+
+	err = s.pgrest.DeleteClassFunction(ctx, jwt, in)
+	if err != nil {
+		return err
+	}
+
+	dropFuncSQL := generateDropFunctionSQL("api", in.Body.Name)
+
+	// Execute SQL
+	if err := db.Exec(dropFuncSQL).Error; err != nil {
 		return err
 	}
 

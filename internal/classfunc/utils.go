@@ -1,5 +1,5 @@
-// Package pggen provides tools for generating PostgreSQL-related code and queries.
-package pggen
+// Package classfunc provides tools for generating class-related code and queries.
+package classfunc
 
 import "fmt"
 

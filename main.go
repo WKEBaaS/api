@@ -9,7 +9,6 @@ import (
 	"baas-api/internal/kubeproject"
 	"baas-api/internal/middlewares"
 	"baas-api/internal/minio"
-	"baas-api/internal/pggen"
 	"baas-api/internal/pgrest"
 	"baas-api/internal/project"
 	"baas-api/internal/router"
@@ -30,7 +29,6 @@ func main() {
 	minio.Package(i)
 	pgrest.Package(i)
 	kubeproject.Package(i)
-	pggen.Package(i)
 
 	// Middlewares
 	middlewares.Package(i)

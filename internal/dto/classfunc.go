@@ -15,6 +15,14 @@ type CreateClassFunctionInput struct {
 	}
 }
 
+type DeleteClassFunctionInput struct {
+	Body struct {
+		ProjectID  string `json:"project_id"`
+		ProjectRef string `json:"project_ref"`
+		Name       string `json:"name"`
+	}
+}
+
 type RootNode struct {
 	ClassID         string `json:"class_id"`
 	CheckPermission bool   `json:"check_permission"`
