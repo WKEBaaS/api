@@ -7,3 +7,4 @@ baas-api
 *.jwk
 *.jwk.pub
 /config.yaml
+/tmp
