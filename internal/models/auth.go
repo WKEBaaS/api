@@ -9,7 +9,7 @@ import (
 
 type User struct {
 	ID                 string         `gorm:"type:varchar(21);primaryKey;not null"` // UNIQUE 已由 primaryKey 隱含
-	Username           *string        `gorm:"type:varchar(255);unique"`
+	Name               string         `gorm:"type:varchar(255);unique"`
 	Email              *string        `gorm:"type:varchar(255);unique"`
 	EncryptedPassword  *string        `gorm:"type:varchar(255)"`
 	ConfirmedAt        *time.Time     `gorm:"type:timestamptz"`
@@ -52,7 +52,7 @@ func (Identity) TableName() string {
 }
 
 type Group struct {
-	ID          datatypes.UUID `gorm:"type:uuid;primaryKey;default:uuidv7();column:id"`
+	ID          string         `gorm:"type:uuid;primaryKey;default:uuidv7();column:id"`
 	Name        string         `gorm:"type:varchar(255);not null;unique;column:name"`
 	Description *string        `gorm:"type:text;column:description"`
 	CreatedAt   time.Time      `gorm:"type:timestamptz;not null;default:current_timestamp;column:created_at"`

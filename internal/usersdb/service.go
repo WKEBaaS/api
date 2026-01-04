@@ -32,6 +32,8 @@ type Service interface {
 	UpdateClassPermissions(ctx context.Context, jwt, ref string, classID string, permissions []models.Permission) error
 	CreateClass(ctx context.Context, jwt string, in *dto.CreateClassInput) (*models.Class, error)
 	DeleteClass(ctx context.Context, jwt string, in *dto.DeleteClassInput) error
+	GetUsers(ctx context.Context, jwt string, in *dto.GetRolesInput) ([]models.User, error)
+	GetGroups(ctx context.Context, jwt string, in *dto.GetRolesInput) ([]models.Group, error)
 }
 
 type service struct {

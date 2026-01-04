@@ -6,10 +6,12 @@ import (
 
 	"baas-api/internal/dto"
 	"baas-api/internal/middlewares"
+	"baas-api/internal/models"
 	"baas-api/internal/utils"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/samber/do/v2"
+	"github.com/samber/lo"
 )
 
 type Controller interface {
@@ -22,6 +24,7 @@ type Controller interface {
 	RegisterUpdateUsersClassPermissions(api huma.API)
 	RegisterCreateClass(api huma.API)
 	RegisterDeleteUsersClass(api huma.API)
+	RegisterGetRoles(api huma.API)
 }
 
 type controller struct {
@@ -274,5 +277,53 @@ func (c *controller) RegisterDeleteUsersClass(api huma.API) {
 		}
 
 		return nil, nil
+	})
+}
+
+func (c *controller) RegisterGetRoles(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-project-db-roles",
+		Method:      "GET",
+		Path:        "/project/db-roles",
+		Summary:     "Get Project Database Roles",
+		Description: "Retrieve users and groups from the project's users database.",
+		Tags:        []string{"UsersDB"},
+		Middlewares: huma.Middlewares{c.authMiddleware},
+	}, func(ctx context.Context, in *dto.GetRolesInput) (*dto.GetRolesOutput, error) {
+		jwt, err := utils.GetJWTFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &dto.GetRolesOutput{}
+		switch in.RoleType {
+		case "USER":
+			users, err := c.usersdb.GetUsers(ctx, jwt, in)
+			if err != nil {
+				return nil, err
+			}
+
+			out.Body.Roles = lo.Map(users, func(u models.User, _ int) dto.Role {
+				return dto.Role{
+					ID:    u.ID,
+					Name:  u.Name,
+					Email: u.Email,
+				}
+			})
+		case "GROUP":
+			groups, err := c.usersdb.GetGroups(ctx, jwt, in)
+			if err != nil {
+				return nil, err
+			}
+
+			out.Body.Roles = lo.Map(groups, func(g models.Group, _ int) dto.Role {
+				return dto.Role{
+					ID:   g.ID,
+					Name: g.Name,
+				}
+			})
+		}
+
+		return out, nil
 	})
 }
