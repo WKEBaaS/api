@@ -1,17 +1,17 @@
 package classfunc
 
 import (
+	"baas-api/internal/dto"
+	"baas-api/internal/pgrest"
+	"baas-api/internal/usersdb"
 	"bytes"
 	"context"
 	_ "embed"
 	"reflect"
 	"text/template"
 
-	"baas-api/internal/dto"
-	"baas-api/internal/pgrest"
-	"baas-api/internal/usersdb"
-
 	"github.com/samber/do/v2"
+	"gorm.io/gorm"
 )
 
 type CreateClassFunctionData struct {
@@ -36,8 +36,8 @@ type FunctionVariable struct {
 }
 
 type Service interface {
-	CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error
-	DeleteClassFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error
+	CreateClassAPIFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error
+	DeleteClassAPIFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error
 }
 
 type service struct {
@@ -66,7 +66,7 @@ func NewService(i do.Injector) (*service, error) {
 	}, nil
 }
 
-func (s *service) CreateClassFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error {
+func (s *service) CreateClassAPIFunction(ctx context.Context, jwt string, in *dto.CreateClassFunctionInput) error {
 	db, err := s.usersdb.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
 	if err != nil {
 		return err
@@ -92,17 +92,23 @@ func (s *service) CreateClassFunction(ctx context.Context, jwt string, in *dto.C
 	createFuncSQL := buf.String()
 
 	// Execute SQL
-	if err := db.Exec(dropFuncSQL).Error; err != nil {
-		return err
-	}
-	if err := db.Exec(createFuncSQL).Error; err != nil {
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(dropFuncSQL).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(createFuncSQL).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *service) DeleteClassFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error {
+func (s *service) DeleteClassAPIFunction(ctx context.Context, jwt string, in *dto.DeleteClassFunctionInput) error {
 	db, err := s.usersdb.GetDB(ctx, jwt, in.Body.ProjectRef, "superuser")
 	if err != nil {
 		return err

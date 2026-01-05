@@ -2,11 +2,11 @@
 package classfunc
 
 import (
-	"context"
-
 	"baas-api/internal/dto"
 	"baas-api/internal/middlewares"
 	"baas-api/internal/utils"
+	"context"
+	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/samber/do/v2"
@@ -40,12 +40,13 @@ func (c *controller) RegisterCreateClassFunc(api huma.API) {
 		Tags:        []string{"UsersDB"},
 		Middlewares: huma.Middlewares{c.authMiddleware},
 	}, func(ctx context.Context, in *dto.CreateClassFunctionInput) (*struct{}, error) {
+		slog.Debug("CreateClassFunction", "input", in)
 		jwt, err := utils.GetJWTFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		err = c.classfunc.CreateClassFunction(ctx, jwt, in)
+		err = c.classfunc.CreateClassAPIFunction(ctx, jwt, in)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +68,7 @@ func (c *controller) RegisterCreateClassFunc(api huma.API) {
 			return nil, err
 		}
 
-		err = c.classfunc.DeleteClassFunction(ctx, jwt, in)
+		err = c.classfunc.DeleteClassAPIFunction(ctx, jwt, in)
 		if err != nil {
 			return nil, err
 		}
