@@ -22,7 +22,7 @@ BEGIN
     END IF;
 {{- end }}
 
-{{- if .RootNode.CheckBits }}
+{{- if and .RootNode.CheckPermission .RootNode.CheckBits }}
     -- RootNode permission check
     DECLARE
         v_permission_bits INTEGER;
